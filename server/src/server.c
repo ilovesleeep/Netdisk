@@ -1,6 +1,4 @@
-#include "network.h"
-#include "parser.h"
-#include "threadpool.h"
+#include "../include/server.h"
 
 #define MAXEVENTS 1024
 #define MAXLINE 1024
@@ -11,7 +9,7 @@ void exitHandler(int signo) {
     write(g_exit_pipe[1], "1", 1);
 }
 
-int main(int argc, char* argv[]) {
+int serverMain(void) {
     pipe(g_exit_pipe);
     pid_t pid = fork();
     switch (pid) {

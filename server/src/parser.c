@@ -1,4 +1,4 @@
-#include "parser.h"
+#include "../include/parser.h"
 
 #define MAXLINE 1024
 #define MAXARGS 32
