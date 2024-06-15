@@ -7,6 +7,6 @@
 
 int serverMain(void);
 int serverExit(ThreadPool* pool);
-void addTask(int connfd, ThreadPool* pool);
+void requestHandler(int connfd, ThreadPool* pool, WorkDir** workdir_table);
 
 #endif
