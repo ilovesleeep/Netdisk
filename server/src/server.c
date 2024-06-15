@@ -19,7 +19,7 @@ int serverMain(void) {
             break;
         default:
             // 父进程
-            printf("[INFO] %d MCV reporting\n", getpid());
+            printf("[INFO] %d Parent porcess reporting\n", getpid());
             close(g_exit_pipe[0]);
             // 捕获 SIGUSR1 信号
             if (signal(SIGUSR1, exitHandler) == SIG_ERR) {
@@ -30,7 +30,7 @@ int serverMain(void) {
             exit(0);
     }
     // 子进程
-    printf("[INFO] %d Kirov reporting\n", getpid());
+    printf("[INFO] %d Child process reporting\n", getpid());
     close(g_exit_pipe[1]);
 
     // 读取配置文件
@@ -48,7 +48,7 @@ int serverMain(void) {
 
     // 监听端口
     int listenfd = tcpListen(conf.port);
-    printf("[INFO] Location confirmed port %d\n", conf.port);
+    printf("[INFO] Listening on port %d\n", conf.port);
     epollAdd(epfd, listenfd);
 
     struct epoll_event* ready_events =
@@ -67,63 +67,63 @@ int serverMain(void) {
                 int connfd =
                     accept(listenfd, (struct sockaddr*)&client_addr, &addrlen);
 
-                // 打印 client 信息
-                char ip_str[50];
-                inet_ntop(client_addr.ss_family,
-                          getIpAddr((struct sockaddr*)&client_addr), ip_str,
-                          50);
-                printf("[INFO] We're being attacked at %s\n", ip_str);
-
                 // 添加到 epoll
                 epollAdd(epfd, connfd);
 
             } else if (ready_events[i].data.fd == g_exit_pipe[0]) {
-                // 父进程传来信号
-                printf("[INFO] All the comrades, exit!\n");
+                // 父进程传来退出信号
+                serverExit(pool);
 
-                // 通知各个子线程退出
-                for (int j = 0; j < pool->num_threads; j++) {
-                    // 优雅退出
-                    Task exit_task = {-1, NULL};
-                    blockqPush(pool->task_queue, &exit_task);
-                }
-                // 等待各个子线程退出
-                for (int j = 0; j < pool->num_threads; j++) {
-                    pthread_join(pool->threads[j], NULL);
-                }
-
-                // 主线程退出
-                printf("[INFO] For home country, see you!\n");
-                pthread_exit(0);
             } else {
                 // 客户端有数据可读
-                int connfd = ready_events[i].data.fd;
-
-                // 接收、处理请求
-                char req[MAXLINE] = {0};
-                int retval = recv(connfd, req, MAXLINE, 0);
-                if (retval < 0) {
-                    error(0, errno, "recv");
-                    close(connfd);
-                } else if (retval == 0) {
-                    printf("[INFO] We are the champions, my friend!\n");
-                    close(connfd);
-                } else {
-                    // 把任务添加到任务队列
-
-                    Task* ptask = (Task*)malloc(sizeof(Task));
-                    ptask->fd = connfd;
-                    ptask->args = parseRequest(req);
-#if DEBUG
-                    for (char **p = ptask->args, i = 0; *p != NULL; ++p, ++i) {
-                        printf("arg[%d] = %s\n", i, *p);
-                    }
-#endif
-                    blockqPush(pool->task_queue, ptask);
-                }
+                addTask(ready_events[i].data.fd, pool);
             }
         }
     }
 
     return 0;
+}
+
+int serverExit(ThreadPool* pool) {
+    // 父进程传来信号
+    printf("[INFO] All the comrades, exit!\n");
+
+    // 通知各个子线程退出
+    for (int j = 0; j < pool->num_threads; j++) {
+        // 优雅退出
+        Task exit_task = {-1, NULL};
+        blockqPush(pool->task_queue, &exit_task);
+    }
+    // 等待各个子线程退出
+    for (int j = 0; j < pool->num_threads; j++) {
+        pthread_join(pool->threads[j], NULL);
+    }
+
+    // 主线程退出
+    printf("[INFO] For home country, see you!\n");
+    pthread_exit(0);
+}
+
+void addTask(int connfd, ThreadPool* pool) {
+    // 接收、处理请求
+    char req[MAXLINE] = {0};
+    int retval = recv(connfd, req, MAXLINE, 0);
+    if (retval < 0) {
+        error(0, errno, "recv");
+        close(connfd);
+    } else if (retval == 0) {
+        printf("[INFO] Say goodbye to connection %d\n", connfd);
+        close(connfd);
+    } else {
+        // 把任务添加到任务队列
+        Task* task = (Task*)malloc(sizeof(Task));
+        task->fd = connfd;
+        task->args = parseRequest(req);
+#if DEBUG
+        for (char **p = ptask->args, i = 0; *p != NULL; ++p, ++i) {
+            printf("arg[%d] = %s\n", i, *p);
+        }
+#endif
+        blockqPush(pool->task_queue, task);
+    }
 }
