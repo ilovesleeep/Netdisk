@@ -225,3 +225,10 @@ void taskHandler(Task* task) {
             break;
     }
 }
+
+void workdirInit(WorkDir** workdir_table, int connfd) {
+    // TODO: error checking
+    workdir_table[connfd] = (WorkDir*)malloc(sizeof(WorkDir));
+    workdir_table[connfd]->path = (char*)malloc(MAXLINE * sizeof(char));
+    workdir_table[connfd]->index = (int*)malloc(MAXLINE * sizeof(int));
+}

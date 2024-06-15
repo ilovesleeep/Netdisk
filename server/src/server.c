@@ -54,6 +54,9 @@ int serverMain(void) {
     struct epoll_event* ready_events =
         (struct epoll_event*)calloc(MAXEVENTS, sizeof(struct epoll_event));
 
+    // 存储用户当前目录
+    WorkDir* workdir_table[MAXEVENTS] = {0};
+
     // 主循环
     while (1) {
         int nready = epoll_wait(epfd, ready_events, MAXEVENTS, -1);
@@ -70,13 +73,16 @@ int serverMain(void) {
                 // 添加到 epoll
                 epollAdd(epfd, connfd);
 
+                // 初始化 workdir
+                workdirInit(workdir_table, connfd);
+
             } else if (ready_events[i].data.fd == g_exit_pipe[0]) {
                 // 父进程传来退出信号
                 serverExit(pool);
 
             } else {
-                // 客户端有数据可读
-                addTask(ready_events[i].data.fd, pool);
+                // 客户端发过来请求
+                requestHandler(ready_events[i].data.fd, pool, workdir_table);
             }
         }
     }
@@ -104,7 +110,7 @@ int serverExit(ThreadPool* pool) {
     pthread_exit(0);
 }
 
-void addTask(int connfd, ThreadPool* pool) {
+void requestHandler(int connfd, ThreadPool* pool, WorkDir** workdir_table) {
     // 接收、处理请求
     char req[MAXLINE] = {0};
     int retval = recv(connfd, req, MAXLINE, 0);
@@ -119,7 +125,9 @@ void addTask(int connfd, ThreadPool* pool) {
         Task* task = (Task*)malloc(sizeof(Task));
         task->fd = connfd;
         task->args = parseRequest(req);
-#if DEBUG
+        task->wd_table = workdir_table;
+
+#ifdef DEBUG
         for (char **p = ptask->args, i = 0; *p != NULL; ++p, ++i) {
             printf("arg[%d] = %s\n", i, *p);
         }

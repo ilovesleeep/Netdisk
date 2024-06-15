@@ -60,6 +60,8 @@ Command getCommand(const char* cmd) {
         return CMD_RM;
     } else if (strcmp(cmd, "pwd") == 0) {
         return CMD_PWD;
+    } else if (strcmp(cmd, "mkdir") == 0) {
+        return CMD_MKDIR;
     } else if (strcmp(cmd, "gets") == 0) {
         return CMD_GETS;
     } else if (strcmp(cmd, "puts") == 0) {

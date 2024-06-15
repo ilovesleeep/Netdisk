@@ -6,9 +6,19 @@
 #include "parser.h"
 
 typedef struct {
+    char* path;
+    int* index;
+} WorkDir;
+
+typedef struct {
     int fd;
     char** args;
+    WorkDir** wd_table;  // connfd 作为索引
 } Task;
+
+void workdirInit(WorkDir** workdir_table, int connfd);
+void workdirUpdate(Task* task);
+void workdirFree(Task* task);
 
 int sendn(int sockfd, void* buf, int length);
 int recvn(int sockfd, void* buf, int length);
