@@ -1,4 +1,4 @@
-#include "blockq.h"
+#include "../include/blockq.h"
 
 BlockQ* blockqCreate(void) {
     BlockQ* q = (BlockQ*)calloc(1, sizeof(BlockQ));
