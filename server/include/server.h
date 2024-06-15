@@ -6,5 +6,7 @@
 #include "threadpool.h"
 
 int serverMain(void);
+int serverExit(ThreadPool* pool);
+void addTask(int connfd, ThreadPool* pool);
 
 #endif

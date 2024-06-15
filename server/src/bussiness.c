@@ -141,68 +141,58 @@ void recvFile(int sockfd) {
     close(fd);
 }
 
-void cdCmd(Task* ptask, char* buf) {
-    char path[MAXLINE] = "~";
-    if (ptask->args[1] != NULL) {
-        // TODO: path checking
-        // 处理 ..
-        sprintf(path, "~/%s", ptask->args[1]);
-        send(ptask->fd, path, strlen(path), 0);
-    } else {
-        send(ptask->fd, path, strlen(path), 0);
-    }
-    // TODO: error checking
+void cdCmd(Task* task) {
+    // TODO:
 
     return;
 }
 
-void lsCmd(char* buf) {
-    strcpy(buf, "Permission denied");
-    // DIR* pdir = opendir(src_)
+void lsCmd(Task* task) {
+    // TODO:
 
     return;
 }
 
-void pwdCmd(char* buf) {
-    getcwd(buf, MAXLINE);
+void pwdCmd(Task* task) {
+    // TODO:
+
     return;
 }
 
-void exitCmd(char* buf) {
-    strcpy(buf, "I will miss you");
+void exitCmd(Task* task) {
+    // TODO:
+
     return;
 }
 
-void unknownCmd(char* buf) {
-    strcpy(buf, "What can I say");
+void unknownCmd(Task* task) {
+    // TODO:
+
     return;
 }
 
-void taskHandler(Task* ptask, char* buf) {
-    switch (getCommand(ptask->args[0])) {
+void taskHandler(Task* task) {
+    switch (getCommand(task->args[0])) {
         case CMD_CD:
-            cdCmd(ptask, buf);
+            cdCmd(task);
             break;
         case CMD_LS:
-            lsCmd(buf);
+            lsCmd(task);
             break;
         case CMD_PWD:
-            pwdCmd(buf);
+            pwdCmd(task);
             break;
         case CMD_GETS:
-            sendFile(ptask->fd, "file1");
+            sendFile(task);
             break;
         case CMD_PUTS:
-            sendFile(ptask->fd, "file1");
+            sendFile(task);
             break;
         case CMD_EXIT:
-            exitCmd(buf);
+            exitCmd(ptask);
             break;
         default:
-            unknownCmd(buf);
+            unknownCmd(task);
             break;
-    }
-    if (*buf != '\0') {
-        send(ptask->fd, buf, strlen(buf), 0);
     }
 }
