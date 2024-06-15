@@ -153,7 +153,31 @@ void lsCmd(Task* task) {
     return;
 }
 
+void rmCmd(Task* task) {
+    // TODO:
+
+    return;
+}
+
 void pwdCmd(Task* task) {
+    // TODO:
+
+    return;
+}
+
+void getsCmd(Task* task) {
+    // TODO:
+
+    return;
+}
+
+void putsCmd(Task* task) {
+    // TODO:
+
+    return;
+}
+
+void mkdirCmd(Task* task) {
     // TODO:
 
     return;
@@ -179,17 +203,22 @@ void taskHandler(Task* task) {
         case CMD_LS:
             lsCmd(task);
             break;
+        case CMD_RM:
+            break;
         case CMD_PWD:
             pwdCmd(task);
             break;
+        case CMD_MKDIR:
+            mkdirCmd(task);
+            break;
         case CMD_GETS:
-            sendFile(task);
+            getsCmd(task);
             break;
         case CMD_PUTS:
-            sendFile(task);
+            putsCmd(task);
             break;
         case CMD_EXIT:
-            exitCmd(ptask);
+            exitCmd(task);
             break;
         default:
             unknownCmd(task);
