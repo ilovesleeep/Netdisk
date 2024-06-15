@@ -66,6 +66,8 @@ Command getCommand(const char* cmd) {
         return CMD_GETS;
     } else if (strcmp(cmd, "puts") == 0) {
         return CMD_PUTS;
+    } else if (strcmp(cmd, "mkdir") == 0) {
+        return CMD_MKDIR;
     } else if (strcmp(cmd, "exit") == 0) {
         return CMD_EXIT;
     } else {
