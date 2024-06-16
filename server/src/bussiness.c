@@ -1,5 +1,7 @@
 #include "../include/bussiness.h"
 
+#include <stdlib.h>
+
 #define BUFSIZE 4096
 #define MAXLINE 1024
 #define BIGFILE_SIZE (100 * 1024 * 1024)
@@ -38,18 +40,7 @@ int recvn(int fd, void* buf, int length) {
     return 0;
 }
 
-void sendFile(int sockfd, const char* path) {
-    int fd = open(path, O_RDONLY);
-    if (fd == -1) {
-        error(1, errno, "open %s", path);
-    }
-
-    // 先发文件名
-    DataBlock block;
-    strcpy(block.data, path);
-    block.length = strlen(path);
-    sendn(sockfd, &block, sizeof(int) + block.length);
-
+void sendFile(int sockfd, int fd) {
     // 发送文件大小
     struct stat statbuf;
     fstat(fd, &statbuf);
@@ -230,13 +221,69 @@ int cdCmd(Task* task) {
 }
 
 void lsCmd(Task* task) {
-    // TODO:
+    // 校验参数,发送校验结果，若为错误则继续发送错误信息
+    if (task->args[1] != NULL) {
+        int sendstat = 1;
+        send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
+        char error_info[] = "parameter number error";
+        int info_len = strlen(error_info);
+        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+        send(task->fd, error_info, info_len, MSG_NOSIGNAL);
+        return;
+    } else {
+        int sendstat = 0;
+        send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
+    }
 
+    // 获取当前路径
+    char path[1000] = {0};
+    WorkDir* pathbase = task->wd_table[task->fd];
+    strncpy(path, pathbase->path, pathbase->index[pathbase->index[0]] + 1);
+
+    // 打开目录
+    DIR* dir = opendir(pathbase->path);
+
+    // 发送文件信息
+    struct dirent* p = NULL;
+    while ((p = readdir(dir))) {
+        if (strcmp(p->d_name, ".") == 0 || strcmp(p->d_name, "..") == 0) {
+            continue;
+        }
+        int info_len = strlen(p->d_name);
+        char send_info[1000] = {0};
+        strcpy(send_info, p->d_name);
+        // 发送文件名长度及文件名
+        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+        send(task->fd, send_info, info_len, MSG_NOSIGNAL);
+    }
+    // 发送int类型的0(这个文件名长度为0)代表文件已发完
+    int info_len = 0;
+    send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
     return;
 }
 
 void rmCmd(Task* task) {
     // TODO:
+    // 一次只能删除一个文件
+    // 错误校验
+    // 获取当前路径
+    char curr_path[MAXLINE] = {0};
+    WorkDir* wd = task->wd_table[task->fd];
+    strncpy(curr_path, wd->path, strlen(wd->path));
+
+    int index = wd->index[wd->index[0]];
+    curr_path[index + 1] = '\0';
+
+    char dir[2 * MAXLINE] = {0};
+    sprintf(dir, "%s/%s", curr_path, task->args[1]);
+
+    // 使用remove函数删除文件
+    if (remove(dir) == 0) {
+        printf("Successfully deleted %s\n", dir);
+        // send(task->fd,"0",sizeof("0"),0);
+    } else {
+        perror("Error deleting file");
+    }
 
     return;
 }
@@ -248,8 +295,64 @@ void pwdCmd(Task* task) {
 }
 
 void getsCmd(Task* task) {
-    // TODO:
+    // 获取当前路径
+    char path[1000] = {0};
+    WorkDir* pathbase = task->wd_table[task->fd];
+    strncpy(path, pathbase->path, pathbase->index[pathbase->index[0]] + 1);
 
+    // 确认参数数量是否正确
+    if (task->args[1] == NULL) {
+        int send_stat = 1;
+        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+        char error_info[] = "no such parameter";
+        int info_len = strlen(error_info);
+        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+        send(task->fd, error_info, info_len, MSG_NOSIGNAL);
+        return;
+    } else {
+        int send_stat = 0;
+        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+    }
+    // 发送文件
+    char** parameter = task->args;
+    while (*(++parameter)) {
+        static int i = 0;  // 第一个文件
+        i++;
+        char path_file[1000] = {0};
+        sprintf(path_file, "%s/%s", path, *parameter);
+
+        int fd = open(path_file, O_RDWR);
+        // 检查文件是否存在
+        // 不存在
+        if (fd == -1) {
+            int send_stat = 1;
+            send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+
+            char error_info[1000] = {0};
+            sprintf(error_info, "%s%d", "no such file : file number : ", i);
+            int info_len = strlen(error_info);
+            send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+            send(task->fd, error_info, info_len, MSG_NOSIGNAL);
+            return;
+        }
+        // 存在
+        int send_stat = 0;
+        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+        // 先发文件名
+        DataBlock block;
+        strcpy(block.data, *parameter);
+        block.length = strlen(*parameter);
+        sendn(task->fd, &block, sizeof(int) + block.length);
+        sendFile(task->fd, fd);  // sendfile中close了fd
+        printf("hello world\n");
+    }
+    // 所有文件发送完毕
+    int send_stat = 1;
+    send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+    char send_info[] = "SUCCESS";
+    int info_len = strlen(send_info);
+    send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+    send(task->fd, send_info, info_len, MSG_NOSIGNAL);
     return;
 }
 
@@ -260,7 +363,59 @@ void putsCmd(Task* task) {
 }
 
 void mkdirCmd(Task* task) {
-    // TODO:
+    // if (sizeof(task ->args[1]) >= 1000) {
+    //     error(1, 0, "mkdir_dirlen too long!");
+    // }
+
+    // 找到当前目录
+    // bug: 如果在极端情况下，path有1k长度，mkdir_dirlen也有1k长度，会溢出
+    char curr_path[MAXLINE] = {0};
+    WorkDir* wd = task->wd_table[task->fd];
+    strncpy(curr_path, wd->path, strlen(wd->path));
+
+    int index = wd->index[wd->index[0]];
+    curr_path[index + 1] = '\0';
+
+    // 将当前目录和args[1]拼接在一起
+    char dir[2 * MAXLINE] = {0};
+    sprintf(dir, "%s/%s", curr_path, task->args[1]);
+
+    // debug
+    // printf("wd->index[1] = %d, wd->index[0] = %d\n", wd->index[wd->index[0]],
+    // wd->index[0]); printf("wdpath = %s\n", wd->path); printf("curpath =
+    // %s\n", curr_path); printf("dir = %s\n",dir);
+
+    // 根据dir递归创建目录
+    // 找每个'/',将其替换成'\0'
+    for (char* p = dir + 1; *p; ++p) {
+        if (*p == '/') {
+            // 这里没有跳过多余的'/'，但没有出bug，大概率是mkdir背后做了这个事情
+            *p = '\0';
+
+            if (mkdir(dir, 0777) && errno != EEXIST) {
+                char errmsg[MAXLINE] = "mkdir";
+                strncat(errmsg, strerror(errno),
+                        sizeof(errmsg) - strlen(strerror(errno)) - 1);
+                send(task->fd, errmsg, strlen(errmsg), 0);
+                // 后面补日志
+                error(0, errno, "%d mkdir:", task->fd);
+            }
+
+            *p = '/';
+        }
+    }
+
+    if (mkdir(dir, 0777) && errno != EEXIST) {
+        char errmsg[MAXLINE] = "mkdir";
+        strncat(errmsg, strerror(errno),
+                sizeof(errmsg) - strlen(strerror(errno)) - 1);
+        send(task->fd, errmsg, strlen(errmsg), 0);
+        // 后面补日志
+        error(0, errno, "%d mkdir:", task->fd);
+    }
+
+    // 成功了给客户端发一个0
+    send(task->fd, "0", sizeof("0"), 0);
 
     return;
 }
@@ -286,6 +441,7 @@ void taskHandler(Task* task) {
             lsCmd(task);
             break;
         case CMD_RM:
+            rmCmd(task);
             break;
         case CMD_PWD:
             pwdCmd(task);
