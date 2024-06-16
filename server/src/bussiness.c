@@ -279,9 +279,13 @@ void taskHandler(Task* task) {
     }
 }
 
-void workdirInit(WorkDir** workdir_table, int connfd) {
+void workdirInit(WorkDir** workdir_table, int connfd, char* username) {
     // TODO: error checking
     workdir_table[connfd] = (WorkDir*)malloc(sizeof(WorkDir));
     workdir_table[connfd]->path = (char*)malloc(MAXLINE * sizeof(char));
     workdir_table[connfd]->index = (int*)malloc(MAXLINE * sizeof(int));
+
+    strcpy(workdir_table[connfd]->path, username);
+    workdir_table[connfd]->index[0] = 1;
+    workdir_table[connfd]->index[1] = strlen(username) - 1;
 }

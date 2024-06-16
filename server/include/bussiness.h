@@ -16,8 +16,7 @@ typedef struct {
     WorkDir** wd_table;  // connfd 作为索引
 } Task;
 
-void workdirInit(WorkDir** workdir_table, int connfd);
-void workdirUpdate(Task* task);
+void workdirInit(WorkDir** workdir_table, int connfd, char* username);
 void workdirFree(Task* task);
 
 int sendn(int sockfd, void* buf, int length);
