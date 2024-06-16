@@ -464,11 +464,8 @@ void taskHandler(Task* task) {
 }
 
 void taskFree(Task* task) {
-    char** args = task->args;
-    while (args) {
-        char* tmp = *args;
-        ++args;
-        free(tmp);
+    for (int i = 0; task->args[i] != NULL; ++i) {
+        free(task->args[i]);
     }
     free(task->args);
     free(task);

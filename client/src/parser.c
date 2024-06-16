@@ -8,22 +8,14 @@ char** parseRequest(const char* req) {
 
     char* tmp = strdup(req);
     char* token = strtok(tmp, " \r\n\t");
-    for (int i = 0; i < MAXARGS && token != NULL; ++i) {
+    int i = 0;
+    for (; i < MAXARGS && token != NULL; ++i) {
         int token_len = strlen(token);
-        args[i] = (char*)malloc((token_len + 1) * sizeof(char));  // +1 for '\0'
+        args[i] = (char*)calloc((token_len + 1), sizeof(char));  // +1 for '\0'
         strcpy(args[i], token);
         token = strtok(NULL, " \r\n\t");
     }
     free(tmp);
-
-    printf("baga!\n");
-    char** cur = args;
-    int i = 0;
-    while (cur != NULL) {
-        printf("%s\n", cur[i]);
-        i++;
-    }
-    printf("done!\n");
 
     // 安全考虑，防止越界
     args[MAXARGS - 1] = NULL;
@@ -31,18 +23,8 @@ char** parseRequest(const char* req) {
 }
 
 void argsFree(char** args) {
-    char** cur = args;
-
-    while (cur != NULL) {
-        printf("%s\n", *cur);
-        ++cur;
-    }
-    printf("done!\n");
-
-    while (cur) {
-        char* tmp = *cur;
-        ++cur;
-        free(tmp);
+    for (int i = 0; args[i] != NULL; ++i) {
+        free(args[i]);
     }
     free(args);
 }
