@@ -52,9 +52,7 @@ int main(int argc, char* argv[]) {
                 puts(buf);
                 break;
             case CMD_GETS:
-                printf("[INFO] %s start download\n", "file1");
-                recvFile(sockfd);
-                printf("[INFO] %s download complete\n", "file1");
+                getsCmd(sockfd);
                 break;
             case CMD_PUTS:
                 break;
