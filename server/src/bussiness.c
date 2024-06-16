@@ -1,4 +1,5 @@
 #include "../include/bussiness.h"
+#include <stdlib.h>
 
 #define BUFSIZE 4096
 #define MAXLINE 1024
@@ -38,17 +39,7 @@ int recvn(int fd, void* buf, int length) {
     return 0;
 }
 
-void sendFile(int sockfd, const char* path) {
-    int fd = open(path, O_RDONLY);
-    if (fd == -1) {
-        error(1, errno, "open %s", path);
-    }
-
-    // 先发文件名
-    DataBlock block;
-    strcpy(block.data, path);
-    block.length = strlen(path);
-    sendn(sockfd, &block, sizeof(int) + block.length);
+void sendFile(int sockfd, int fd) {
 
     // 发送文件大小
     struct stat statbuf;
@@ -203,8 +194,65 @@ void pwdCmd(Task* task) {
 }
 
 void getsCmd(Task* task) {
-    // TODO:
+    //获取当前路径
+    char path[1000] = {0};
+    WorkDir* pathbase = task->wd_table[task->fd];
+    strncpy(path, pathbase->path, pathbase->index[pathbase->index[0]] + 1);
 
+    //确认参数数量是否正确
+    if(task->args[1] == NULL){
+        int send_stat = 1;
+        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+        char error_info[] = "no such parameter";
+        int info_len = strlen(error_info);
+        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+        send(task->fd, error_info, info_len, MSG_NOSIGNAL);
+        return;
+    }
+    else{
+        int send_stat = 0;
+        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+    }
+    //发送文件
+    char** parameter = task->args;
+    while(*(++parameter)){
+        static int i = 0;   //第一个文件
+        i++;
+        char path_file[1000] = {0};
+        sprintf(path_file, "%s/%s", path, *parameter);
+        
+        int fd = open(path_file, O_RDWR);
+        //检查文件是否存在
+        //不存在
+        if(fd == -1){
+            int send_stat = 1;
+            send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+
+            char error_info[1000] = {0};
+            sprintf(error_info, "%s%d", "no such file : file number : ", i);
+            int info_len = strlen(error_info);
+            send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+            send(task->fd, error_info, info_len, MSG_NOSIGNAL);
+            return;
+        }
+        //存在
+        int send_stat = 0;
+        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+        // 先发文件名
+        DataBlock block;
+        strcpy(block.data, *parameter);
+        block.length = strlen(*parameter);
+        sendn(task->fd, &block, sizeof(int) + block.length);        
+        sendFile(task->fd, fd); //sendfile中close了fd
+        printf("hello world\n");
+    }
+    //所有文件发送完毕
+    int send_stat = 1;
+    send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+    char send_info[] = "SUCCESS";
+    int info_len = strlen(send_info);
+    send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+    send(task->fd, send_info, info_len, MSG_NOSIGNAL);
     return;
 }
 
