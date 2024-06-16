@@ -1,36 +1,6 @@
 #include "../include/parser.h"
 
-#define MAXLINE 1024
 #define MAXARGS 32
-
-void parseConfig(ServerConfig* conf) {
-    int fd = open("server.conf", O_RDONLY);
-    if (fd == -1) {
-        error(1, errno, "open server.conf");
-    }
-
-    char buf[MAXLINE];
-    read(fd, buf, MAXLINE);
-
-    char* token = strtok(buf, "= \r\n\t");
-    while (token != NULL) {
-        if (strcmp(token, "port") == 0) {
-            token = strtok(NULL, "= \r\n\t");
-
-            printf("[INFO] Set port = %s\n", token);
-            conf->port = atoi(token);
-        } else if (strcmp(token, "num_threads") == 0) {
-            token = strtok(NULL, "= \r\n\t");
-
-            printf("[INFO] Set num_threads = %s\n", token);
-            conf->num_threads = atoi(token);
-        }
-
-        token = strtok(NULL, "= \r\n\t");
-    }
-
-    close(fd);
-}
 
 char** parseRequest(const char* req) {
     // TODO: error checking
