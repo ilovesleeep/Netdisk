@@ -188,7 +188,7 @@ void taskHandler(Task* ptask, char* buf) {
             cdCmd(ptask, buf);
             break;
         case CMD_LS:
-            lsCmd(buf);
+            lsCmd(ptask->fd);
             break;
         case CMD_PWD:
             pwdCmd(buf);
