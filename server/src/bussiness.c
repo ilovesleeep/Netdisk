@@ -213,7 +213,6 @@ int cdCmd(Task* task) {
     // 发送给客户端
     sendn(task->fd, &send_status, sizeof(int));
     int offset = wd->index[1] + 1;  // +1 for start position
-    printf("debug: %s\n", wd->path);
     sprintf(msg, "~%s", wd->path + offset);
     sendn(task->fd, msg, strlen(msg));
 
@@ -465,10 +464,10 @@ void taskHandler(Task* task) {
 }
 
 void taskFree(Task* task) {
-    char* cur = *task->args;
-    while (cur != NULL) {
-        char* tmp = cur;
-        ++cur;
+    char** args = task->args;
+    while (args) {
+        char* tmp = *args;
+        ++args;
         free(tmp);
     }
     free(task->args);

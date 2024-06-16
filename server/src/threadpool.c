@@ -21,7 +21,8 @@ void* eventLoop(void* arg) {
         char buf[MAXLINE];
         bzero(buf, MAXLINE);
         taskHandler(task);
-        taskFree(task);
+        // taskFree(task);
+        free(task);
 
         printf("[INFO] %lu Ura! Waiting orders.\n", tid);
     }
