@@ -60,10 +60,7 @@ int main(int argc, char* argv[]) {
             case CMD_PUTS:
                 break;
             case CMD_MKDIR:
-                recv(sockfd, buf, MAXLINE, 0);
-                if (strcmp(buf,"0") != 0) {
-                    puts(buf);
-                }
+                mkdirCmd(sockfd, buf);
                 break;
             case CMD_EXIT:
                 recv(sockfd, buf, MAXLINE, 0);

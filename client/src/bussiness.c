@@ -167,6 +167,14 @@ void pwdCmd(char* buf) {
     return;
 }
 
+void mkdirCmd(int sockfd, char* buf) {
+    recv(sockfd, buf, MAXLINE, 0);
+    if (strcmp(buf,"0") != 0) {
+        puts(buf);
+    }
+    return;
+}
+
 void exitCmd(char* buf) {
     strcpy(buf, "I will miss you");
     return;
@@ -177,31 +185,3 @@ void unknownCmd(char* buf) {
     return;
 }
 
-void taskHandler(Task* ptask, char* buf) {
-    switch (getCommand(ptask->args[0])) {
-        case CMD_CD:
-            cdCmd(ptask, buf);
-            break;
-        case CMD_LS:
-            lsCmd(buf);
-            break;
-        case CMD_PWD:
-            pwdCmd(buf);
-            break;
-        case CMD_GETS:
-            sendFile(ptask->fd, "file1");
-            break;
-        case CMD_PUTS:
-            sendFile(ptask->fd, "file1");
-            break;
-        case CMD_EXIT:
-            exitCmd(buf);
-            break;
-        default:
-            unknownCmd(buf);
-            break;
-    }
-    if (*buf != '\0') {
-        send(ptask->fd, buf, strlen(buf), 0);
-    }
-}
