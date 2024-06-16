@@ -58,6 +58,7 @@ int main(int argc, char* argv[]) {
                 getsCmd(sockfd);
                 break;
             case CMD_PUTS:
+                putsCmd(sockfd, args);
                 break;
             case CMD_MKDIR:
                 mkdirCmd(sockfd, buf);
