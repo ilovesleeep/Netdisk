@@ -155,9 +155,14 @@ void cdCmd(Task* ptask, char* buf) {
     return;
 }
 
-void lsCmd(char* buf) {
-    strcpy(buf, "Permission denied");
-    // DIR* pdir = opendir(src_)
+void lsCmd(int sockfd) {
+    int name_len = 0;
+    while(recv(sockfd, &name_len, sizeof(int), MSG_WAITALL)){
+        char filename[1000] = {0};
+        recv(sockfd, filename, name_len, MSG_WAITALL);
+        printf("%s\t", filename);
+    }
+    printf("\n");
 
     return;
 }
