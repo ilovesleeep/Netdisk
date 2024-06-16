@@ -168,6 +168,7 @@ void lsCmd(Task* task) {
     WorkDir* pathbase = task->wd_table[task->fd];
     strncpy(path, pathbase->path, pathbase->index[pathbase->index[0]]);
 
+    printf("path: %s\n", path);
     //打开目录
     DIR* dir = opendir(pathbase->path);
 
