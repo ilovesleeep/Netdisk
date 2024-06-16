@@ -4,7 +4,7 @@
 #define MAXARGS 32
 
 void parseConfig(ServerConfig* conf) {
-    int fd = open("server.conf", O_RDONLY);
+    int fd = open("../config/server.conf", O_RDONLY);
     if (fd == -1) {
         error(1, errno, "open server.conf");
     }

@@ -23,6 +23,8 @@ typedef enum {
 void parseConfig(ServerConfig* conf);
 
 char** parseRequest(const char* req);
+void argsFree(char** args);
+
 Command getCommand(const char* cmd);
 
 #endif

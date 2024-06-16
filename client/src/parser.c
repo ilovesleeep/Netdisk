@@ -1,4 +1,4 @@
-#include "parser.h"
+#include "../include/parser.h"
 
 #define MAXLINE 1024
 #define MAXARGS 32
@@ -49,6 +49,16 @@ char** parseRequest(const char* req) {
     // 安全考虑，防止越界
     args[MAXARGS - 1] = NULL;
     return args;
+}
+
+void argsFree(char** args) {
+    char* cur = *args;
+    while (cur) {
+        char* tmp = cur;
+        ++cur;
+        free(tmp);
+    }
+    free(args);
 }
 
 Command getCommand(const char* cmd) {

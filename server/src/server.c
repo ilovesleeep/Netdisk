@@ -74,7 +74,8 @@ int serverMain(void) {
                 epollAdd(epfd, connfd);
 
                 // 初始化 workdir
-                workdirInit(workdir_table, connfd);
+                char username[] = "user";
+                workdirInit(workdir_table, connfd, username);
 
             } else if (ready_events[i].data.fd == g_exit_pipe[0]) {
                 // 父进程传来退出信号
@@ -119,6 +120,7 @@ void requestHandler(int connfd, ThreadPool* pool, WorkDir** workdir_table) {
         close(connfd);
     } else if (retval == 0) {
         printf("[INFO] Say goodbye to connection %d\n", connfd);
+        workdirFree(workdir_table[connfd]);
         close(connfd);
     } else {
         // 把任务添加到任务队列
@@ -127,11 +129,6 @@ void requestHandler(int connfd, ThreadPool* pool, WorkDir** workdir_table) {
         task->args = parseRequest(req);
         task->wd_table = workdir_table;
 
-#ifdef DEBUG
-        for (char **p = ptask->args, i = 0; *p != NULL; ++p, ++i) {
-            printf("arg[%d] = %s\n", i, *p);
-        }
-#endif
         blockqPush(pool->task_queue, task);
     }
 }

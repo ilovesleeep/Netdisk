@@ -1,8 +1,8 @@
 #include <func.h>
 
-#include "bussiness.h"
-#include "network.h"
-#include "parser.h"
+#include "../include/bussiness.h"
+#include "../include/network.h"
+#include "../include/parser.h"
 
 #define MAXLINE 1024
 
@@ -28,7 +28,6 @@ int main(int argc, char* argv[]) {
         char** args = parseRequest(buf);
         Command cmd = getCommand(args[0]);
         if (cmd == CMD_UNKNOWN) {
-            printf("%s at %d\n", args[0], __LINE__);
             continue;
         }
 
@@ -37,10 +36,10 @@ int main(int argc, char* argv[]) {
         bzero(buf, MAXLINE);
 
         // 接收服务器执行的结果
+        int recv_status = 0;
         switch (cmd) {
             case CMD_CD:
-                bzero(cwd, MAXLINE);
-                recv(sockfd, cwd, MAXLINE, 0);
+                cdCmd(sockfd, buf, cwd, &recv_status);
                 break;
             case CMD_LS:
                 recv(sockfd, buf, MAXLINE, 0);
@@ -62,10 +61,7 @@ int main(int argc, char* argv[]) {
             case CMD_MKDIR:
                 break;
             case CMD_EXIT:
-                recv(sockfd, buf, MAXLINE, 0);
-                puts(buf);
-
-                free(args);
+                argsFree(args);
                 close(sockfd);
 
                 return 0;
@@ -73,6 +69,6 @@ int main(int argc, char* argv[]) {
                 break;
         }
         // NOTE: 勿忘我
-        free(args);
+        argsFree(args);
     }
 }
