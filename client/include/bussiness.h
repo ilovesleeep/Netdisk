@@ -22,6 +22,5 @@ void pwdCmd(char* buf);
 void exitCmd(char* buf);
 void unknownCmd(char* buf);
 
-void taskHandler(Task* ptask, char* buf);
 
 #endif
