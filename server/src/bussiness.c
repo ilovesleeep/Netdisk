@@ -166,9 +166,8 @@ void lsCmd(Task* task) {
     //获取当前路径
     char path[1000] = {0};
     WorkDir* pathbase = task->wd_table[task->fd];
-    strncpy(path, pathbase->path, pathbase->index[pathbase->index[0]]);
+    strncpy(path, pathbase->path, pathbase->index[pathbase->index[0]] + 1);
 
-    printf("path: %s\n", path);
     //打开目录
     DIR* dir = opendir(pathbase->path);
 
