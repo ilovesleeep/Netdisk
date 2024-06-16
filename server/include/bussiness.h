@@ -22,7 +22,7 @@ void workdirFree(WorkDir* workdir_tabled);
 int sendn(int sockfd, void* buf, int length);
 int recvn(int sockfd, void* buf, int length);
 
-void sendFile(int sockfd, const char* path);
+void sendFile(int sockfd, int fd);
 void recvFile(int sockfd);
 
 int cdCmd(Task* task);

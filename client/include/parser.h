@@ -20,7 +20,6 @@ typedef enum {
     CMD_UNKNOWN,
 } Command;
 
-void parseConfig(ServerConfig* conf);
 
 char** parseRequest(const char* req);
 void argsFree(char** args);

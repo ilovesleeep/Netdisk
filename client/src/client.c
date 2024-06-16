@@ -42,8 +42,7 @@ int main(int argc, char* argv[]) {
                 cdCmd(sockfd, buf, cwd, &recv_status);
                 break;
             case CMD_LS:
-                recv(sockfd, buf, MAXLINE, 0);
-                puts(buf);
+                lsCmd(sockfd);
                 break;
             case CMD_RM:
                 break;
@@ -52,13 +51,12 @@ int main(int argc, char* argv[]) {
                 puts(buf);
                 break;
             case CMD_GETS:
-                printf("[INFO] %s start download\n", "file1");
-                recvFile(sockfd);
-                printf("[INFO] %s download complete\n", "file1");
+                getsCmd(sockfd);
                 break;
             case CMD_PUTS:
                 break;
             case CMD_MKDIR:
+                mkdirCmd(sockfd, buf);
                 break;
             case CMD_EXIT:
                 argsFree(args);
