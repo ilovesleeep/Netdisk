@@ -1,8 +1,8 @@
 #include <func.h>
 
-#include "bussiness.h"
-#include "network.h"
-#include "parser.h"
+#include "../include/bussiness.h"
+#include "../include/network.h"
+#include "../include/parser.h"
 
 #define MAXLINE 1024
 
@@ -60,6 +60,10 @@ int main(int argc, char* argv[]) {
             case CMD_PUTS:
                 break;
             case CMD_MKDIR:
+                recv(sockfd, buf, MAXLINE, 0);
+                if (strcmp(buf,"0") != 0) {
+                    puts(buf);
+                }
                 break;
             case CMD_EXIT:
                 recv(sockfd, buf, MAXLINE, 0);
