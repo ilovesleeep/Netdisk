@@ -16,15 +16,31 @@ char** parseRequest(const char* req) {
     }
     free(tmp);
 
+    printf("baga!\n");
+    char** cur = args;
+    int i = 0;
+    while (cur != NULL) {
+        printf("%s\n", cur[i]);
+        i++;
+    }
+    printf("done!\n");
+
     // 安全考虑，防止越界
     args[MAXARGS - 1] = NULL;
     return args;
 }
 
 void argsFree(char** args) {
-    char* cur = *args;
+    char** cur = args;
+
+    while (cur != NULL) {
+        printf("%s\n", *cur);
+        ++cur;
+    }
+    printf("done!\n");
+
     while (cur) {
-        char* tmp = cur;
+        char* tmp = *cur;
         ++cur;
         free(tmp);
     }
