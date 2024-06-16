@@ -189,6 +189,39 @@ void pwdCmd(char* buf) {
     return;
 }
 
+void getsCmd(int sockfd){
+    //先检查参数数量是否正确
+    int recv_stat = 0;
+    recv(sockfd, &recv_stat, sizeof(int), MSG_WAITALL);
+    //若错误则接收错误信息，否则直接开始下一步
+    if(recv_stat != 0){
+        int info_len = 0;
+        recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
+        char error_info[1000] = {0};
+        recv(sockfd, error_info, info_len, MSG_WAITALL);
+        puts(error_info);
+        return;
+    }
+
+    //参数正确
+    for(;;){
+        //检查文件是否存在,或是否发送完成
+        int recv_stat = 0;
+        recv(sockfd, &recv_stat, sizeof(int), MSG_WAITALL);
+        if(recv_stat != 0){
+            int info_len = 0;
+            char recv_info[1000] = {0};
+            recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
+            recv(sockfd, recv_info, info_len, MSG_WAITALL);
+            puts(recv_info);
+            break;
+        }
+        //文件存在则接收
+        recvFile(sockfd);
+    }
+    return;
+}
+
 void mkdirCmd(int sockfd, char* buf) {
     recv(sockfd, buf, MAXLINE, 0);
     if (strcmp(buf,"0") != 0) {
