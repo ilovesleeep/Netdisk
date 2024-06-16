@@ -17,11 +17,10 @@ void sendFile(int sockfd, const char* path);
 void recvFile(int sockfd);
 
 void cdCmd(Task* ptask, char* buf);
-void lsCmd(char* buf);
+void lsCmd(int sockfd);
 void pwdCmd(char* buf);
 void exitCmd(char* buf);
 void unknownCmd(char* buf);
 
-void taskHandler(Task* ptask, char* buf);
 
 #endif

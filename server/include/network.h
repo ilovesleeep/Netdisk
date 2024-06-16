@@ -4,7 +4,7 @@
 #include <func.h>
 
 int tcpListen(int port);
-int tcpConnect(const char* host, const char* port);
+
 void* getIpAddr(struct sockaddr* sa);
 
 void epollAdd(int epfd, int fd);
