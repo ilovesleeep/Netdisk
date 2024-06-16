@@ -208,7 +208,7 @@ void rmCmd(Task* task) {
 
     
 
-    // 使用unlink函数删除文件
+    // 使用remove函数删除文件
     if(remove(dir) == 0){
         printf("Successfully deleted %s\n",dir);
         //send(task->fd,"0",sizeof("0"),0);
