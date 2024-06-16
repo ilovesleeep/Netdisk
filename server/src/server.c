@@ -37,14 +37,14 @@ int serverMain(void) {
     ServerConfig conf = {8080, 2};
     parseConfig(&conf);
 
-    // 创建线程池
-    ThreadPool* pool = createThreadPool(conf.num_threads);
-
     // epoll
     int epfd = epoll_create(1);
 
     // g_exit_pipe 读端加入 epoll
     epollAdd(epfd, g_exit_pipe[0]);
+
+    // 创建线程池
+    ThreadPool* pool = createThreadPool(conf.num_threads, epfd);
 
     // 监听端口
     int listenfd = tcpListen(conf.port);

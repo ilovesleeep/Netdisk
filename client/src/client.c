@@ -29,6 +29,10 @@ int main(int argc, char* argv[]) {
         Command cmd = getCommand(args[0]);
         if (cmd == CMD_UNKNOWN) {
             continue;
+        } else if (cmd == CMD_EXIT) {
+            argsFree(args);
+            close(sockfd);
+            return 0;
         }
 
         // 发送命令到服务器
@@ -58,11 +62,6 @@ int main(int argc, char* argv[]) {
             case CMD_MKDIR:
                 mkdirCmd(sockfd, buf);
                 break;
-            case CMD_EXIT:
-                argsFree(args);
-                close(sockfd);
-
-                return 0;
             default:
                 break;
         }

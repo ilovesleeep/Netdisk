@@ -40,7 +40,7 @@ char** parseRequest(const char* req) {
     char* token = strtok(tmp, " \r\n\t");
     for (int i = 0; i < MAXARGS && token != NULL; ++i) {
         int token_len = strlen(token);
-        args[i] = (char*)malloc((token_len + 1) * sizeof(char));  // +1 for '\0'
+        args[i] = (char*)calloc((token_len + 1), sizeof(char));  // +1 for '\0'
         strcpy(args[i], token);
         token = strtok(NULL, " \r\n\t");
     }
