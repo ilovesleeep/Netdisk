@@ -74,7 +74,8 @@ int serverMain(void) {
                 epollAdd(epfd, connfd);
 
                 // 初始化 workdir
-                workdirInit(workdir_table, connfd);
+                char username[] = "user";
+                workdirInit(workdir_table, connfd, username);
 
             } else if (ready_events[i].data.fd == g_exit_pipe[0]) {
                 // 父进程传来退出信号
