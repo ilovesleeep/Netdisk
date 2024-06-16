@@ -183,7 +183,29 @@ void lsCmd(Task* task) {
 
 void rmCmd(Task* task) {
     // TODO:
+    // 一次只能删除一个文件
+    // 错误校验
+    // 获取当前路径
+    char curr_path[MAXLINE] = {0};
+    WorkDir *wd = task->wd_table[task->fd];
+    strncpy(curr_path,wd->path,strlen(wd->path));
+    
+    int index = wd->index[wd->index[0]];
+    curr_path[index + 1] = '\0';
 
+    char dir[2*MAXLINE] = {0};
+    sprintf(dir,"%s/%s",curr_path,task->args[1]);
+
+    
+
+    // 使用remove函数删除文件
+    if(remove(dir) == 0){
+        printf("Successfully deleted %s\n",dir);
+        //send(task->fd,"0",sizeof("0"),0);
+    }else{
+        perror("Error deleting file");
+    }
+    
     return;
 }
 
@@ -342,6 +364,7 @@ void taskHandler(Task* task) {
             lsCmd(task);
             break;
         case CMD_RM:
+            rmCmd(task);
             break;
         case CMD_PWD:
             pwdCmd(task);
