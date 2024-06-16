@@ -1,4 +1,4 @@
-#include "parser.h"
+#include "../include/parser.h"
 
 #define MAXLINE 1024
 #define MAXARGS 32
@@ -66,6 +66,8 @@ Command getCommand(const char* cmd) {
         return CMD_PUTS;
     } else if (strcmp(cmd, "exit") == 0) {
         return CMD_EXIT;
+    } else if (strcmp(cmd, "mkdir") == 0) {
+        return CMD_MKDIR;
     } else {
         return CMD_UNKNOWN;
     }
