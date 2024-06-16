@@ -43,8 +43,7 @@ int main(int argc, char* argv[]) {
                 recv(sockfd, cwd, MAXLINE, 0);
                 break;
             case CMD_LS:
-                recv(sockfd, buf, MAXLINE, 0);
-                puts(buf);
+                lsCmd(sockfd);
                 break;
             case CMD_RM:
                 break;

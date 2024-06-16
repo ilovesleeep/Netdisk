@@ -155,9 +155,31 @@ void cdCmd(Task* ptask, char* buf) {
     return;
 }
 
-void lsCmd(char* buf) {
-    strcpy(buf, "Permission denied");
-    // DIR* pdir = opendir(src_)
+void lsCmd(int sockfd) {
+    //参数校验
+    int recv_stat = 0;
+    recv(sockfd, &recv_stat, sizeof(int), MSG_WAITALL);
+    //错误处理
+    if(recv_stat == 1){
+        int info_len = 0;
+        recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
+        char error_info[1000] = {0};
+        recv(sockfd, error_info, info_len, MSG_WAITALL);
+        puts(error_info);
+        return;
+    }
+
+
+    int name_len = 0;
+    while(recv(sockfd, &name_len, sizeof(int), MSG_WAITALL)){
+        if(name_len == 0){
+            printf("\n");
+            break;
+        }
+        char filename[1000] = {0};
+        recv(sockfd, filename, name_len, MSG_WAITALL);
+        printf("%s\t", filename);
+    }
 
     return;
 }

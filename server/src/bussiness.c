@@ -148,8 +148,46 @@ void cdCmd(Task* task) {
 }
 
 void lsCmd(Task* task) {
-    // TODO:
+    //校验参数,发送校验结果，若为错误则继续发送错误信息
+    if(task->args[1] != NULL){
+        int sendstat = 1;
+        send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
+        char error_info[] = "parameter number error";
+        int info_len = strlen(error_info);
+        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+        send(task->fd, error_info, info_len, MSG_NOSIGNAL);
+        return;
+    }
+    else{
+        int sendstat = 0;
+        send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
+    }
 
+    //获取当前路径
+    char path[1000] = {0};
+    WorkDir* pathbase = task->wd_table[task->fd];
+    strncpy(path, pathbase->path, pathbase->index[pathbase->index[0]]);
+
+    printf("path: %s\n", path);
+    //打开目录
+    DIR* dir = opendir(pathbase->path);
+
+    //发送文件信息
+    struct dirent* p = NULL;
+    while((p = readdir(dir))){
+        if(strcmp(p->d_name, ".") == 0 || strcmp(p->d_name, "..") == 0){
+            continue;
+        }
+        int info_len = strlen(p->d_name);
+        char send_info[1000] = {0};
+        strcpy(send_info, p->d_name);
+        //发送文件名长度及文件名
+        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+        send(task->fd, send_info, info_len, MSG_NOSIGNAL); 
+    }
+    //发送int类型的0(这个文件名长度为0)代表文件已发完
+    int info_len = 0;
+    send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
     return;
 }
 
