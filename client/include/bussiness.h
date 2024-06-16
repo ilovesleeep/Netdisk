@@ -16,12 +16,10 @@ int recvn(int sockfd, void* buf, int length);
 void sendFile(int sockfd, const char* path);
 void recvFile(int sockfd);
 
-void cdCmd(Task* ptask, char* buf);
+int cdCmd(int sockfd, char* buf, char* cwd, int* recv_status);
 void lsCmd(char* buf);
 void pwdCmd(char* buf);
 void exitCmd(char* buf);
 void unknownCmd(char* buf);
-
-void taskHandler(Task* ptask, char* buf);
 
 #endif

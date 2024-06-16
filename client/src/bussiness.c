@@ -1,4 +1,4 @@
-#include "bussiness.h"
+#include "../include/bussiness.h"
 
 #define BUFSIZE 4096
 #define MAXLINE 1024
@@ -141,25 +141,17 @@ void recvFile(int sockfd) {
     close(fd);
 }
 
-void cdCmd(Task* ptask, char* buf) {
-    char path[MAXLINE] = "~";
-    if (ptask->args[1] != NULL) {
-        // TODO: path checking
-        sprintf(path, "~/%s", ptask->args[1]);
-        send(ptask->fd, path, strlen(path), 0);
-    } else {
-        send(ptask->fd, path, strlen(path), 0);
+int cdCmd(int sockfd, char* buf, char* cwd, int* recv_status) {
+    recv(sockfd, recv_status, sizeof(int), 0);
+    if (*recv_status) {
+        recv(sockfd, buf, MAXLINE, 0);
+        printf("Error: %s\n", buf);
+        return -1;
     }
-    // TODO: error checking
 
-    return;
-}
-
-void lsCmd(char* buf) {
-    strcpy(buf, "Permission denied");
-    // DIR* pdir = opendir(src_)
-
-    return;
+    bzero(cwd, MAXLINE);
+    recv(sockfd, cwd, MAXLINE, 0);
+    return 0;
 }
 
 void pwdCmd(char* buf) {
@@ -175,33 +167,4 @@ void exitCmd(char* buf) {
 void unknownCmd(char* buf) {
     strcpy(buf, "What can I say");
     return;
-}
-
-void taskHandler(Task* ptask, char* buf) {
-    switch (getCommand(ptask->args[0])) {
-        case CMD_CD:
-            cdCmd(ptask, buf);
-            break;
-        case CMD_LS:
-            lsCmd(buf);
-            break;
-        case CMD_PWD:
-            pwdCmd(buf);
-            break;
-        case CMD_GETS:
-            sendFile(ptask->fd, "file1");
-            break;
-        case CMD_PUTS:
-            sendFile(ptask->fd, "file1");
-            break;
-        case CMD_EXIT:
-            exitCmd(buf);
-            break;
-        default:
-            unknownCmd(buf);
-            break;
-    }
-    if (*buf != '\0') {
-        send(ptask->fd, buf, strlen(buf), 0);
-    }
 }

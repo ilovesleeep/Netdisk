@@ -16,9 +16,8 @@ typedef struct {
     WorkDir** wd_table;  // connfd 作为索引
 } Task;
 
-void workdirInit(WorkDir** workdir_table, int connfd);
-void workdirUpdate(Task* task);
-void workdirFree(Task* task);
+void workdirInit(WorkDir** workdir_table, int connfd, char* username);
+void workdirFree(WorkDir* workdir_tabled);
 
 int sendn(int sockfd, void* buf, int length);
 int recvn(int sockfd, void* buf, int length);
@@ -26,7 +25,7 @@ int recvn(int sockfd, void* buf, int length);
 void sendFile(int sockfd, const char* path);
 void recvFile(int sockfd);
 
-void cdCmd(Task* task);
+int cdCmd(Task* task);
 void lsCmd(Task* task);
 void rmCmd(Task* task);
 void pwdCmd(Task* task);
@@ -37,5 +36,6 @@ void exitCmd(Task* task);
 void unknownCmd(Task* task);
 
 void taskHandler(Task* task);
+void taskFree(Task* task);
 
 #endif

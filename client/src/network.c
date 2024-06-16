@@ -1,4 +1,4 @@
-#include "network.h"
+#include "../include/network.h"
 
 #define BACKLOG 10
 
@@ -22,20 +22,21 @@ int tcpListen(char* port) {
             continue;
         }
 
-        if ((sockfd = socket(cur->ai_family, cur->ai_socktype, cur->ai_protocol)) == -1) {
+        if ((sockfd = socket(cur->ai_family, cur->ai_socktype,
+                             cur->ai_protocol)) == -1) {
             error(0, errno, "socket");
             cur = cur->ai_next;
             continue;
         }
 
         int opt_on = 1;
-        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, 
-                       &opt_on, sizeof(opt_on)) == -1) {
+        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt_on,
+                       sizeof(opt_on)) == -1) {
             error(1, errno, "setsockopt");
         }
         int opt_off = 0;
-        if (setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY, 
-                       &opt_off, sizeof(opt_off)) == -1) {
+        if (setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY, &opt_off,
+                       sizeof(opt_off)) == -1) {
             error(1, errno, "setsockopt");
         }
 
@@ -48,11 +49,11 @@ int tcpListen(char* port) {
         break;
     }
     freeaddrinfo(res);
-    
+
     if (cur == NULL) {
         error(1, errno, "failed to bind");
     }
-    
+
     if (listen(sockfd, BACKLOG) == -1) {
         error(1, errno, "listen");
     }
@@ -73,7 +74,8 @@ int tcpConnect(const char* host, const char* port) {
 
     int sockfd;
     for (cur = res; cur != NULL; cur = cur->ai_next) {
-        if ((sockfd = socket(cur->ai_family, cur->ai_socktype, cur->ai_protocol)) == -1) {
+        if ((sockfd = socket(cur->ai_family, cur->ai_socktype,
+                             cur->ai_protocol)) == -1) {
             error(0, errno, "socket");
             continue;
         }
@@ -111,7 +113,4 @@ void epollAdd(int epfd, int fd) {
     }
 }
 
-void epollDel(int epfd, int fd) {
-    epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
-}
-
+void epollDel(int epfd, int fd) { epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL); }

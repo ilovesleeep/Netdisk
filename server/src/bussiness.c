@@ -141,10 +141,92 @@ void recvFile(int sockfd) {
     close(fd);
 }
 
-void cdCmd(Task* task) {
-    // TODO:
+int cdCmd(Task* task) {
+    WorkDir* wd = task->wd_table[task->fd];
+    char msg[MAXLINE] = {0};
+    int send_status = 0;
 
-    return;
+    // 检查参数个数是否合法
+    if (task->args[2] != NULL) {
+        // 不合法
+        send_status = 1;
+        sendn(task->fd, &send_status, sizeof(int));
+
+        strcpy(msg, "Parameter at most 1");
+        sendn(task->fd, msg, strlen(msg));
+        return -1;
+    }
+
+    // 没有参数，回到家目录
+    if (task->args[1] == NULL) {
+        sendn(task->fd, &send_status, sizeof(int));
+
+        wd->path[wd->index[1] + 1] = '\0';
+        wd->index[0] = 1;
+        strcpy(msg, "~");
+        sendn(task->fd, msg, strlen(msg));
+        return 0;
+    }
+
+    // 获取当前路径
+    char current_path[MAXLINE];
+    strcpy(current_path, wd->path);
+    current_path[wd->index[wd->index[0]] + 1] = '\0';
+
+    // 检查目标路径是否有效
+    char target_path[MAXLINE];
+    sprintf(target_path, "%s/%s", current_path, task->args[1]);
+    DIR* pdir;
+    if ((pdir = opendir(target_path)) == NULL) {
+        send_status = 1;
+        sendn(task->fd, &send_status, sizeof(int));
+
+        strcpy(msg, strerror(errno));
+        sendn(task->fd, msg, strlen(msg));
+        return -1;
+    }
+    closedir(pdir);
+
+    // 更新 WorkDir
+    char* tmp = strdup(task->args[1]);
+    char* token = strtok(tmp, "/");
+    while (token) {
+        if (strcmp(token, ".") == 0) {
+            ;  // nothing to do
+        } else if (strcmp(token, "..") == 0) {
+            if (wd->index[0] == 1) {
+                // 没有上一级了
+                send_status = 1;
+                sendn(task->fd, &send_status, sizeof(int));
+
+                strcpy(msg, "Permission denied");
+                sendn(task->fd, msg, strlen(msg));
+                free(tmp);
+                return -1;
+            }
+
+            int pre_idx = wd->index[--wd->index[0]];
+            wd->path[pre_idx + 1] = '\0';
+        } else {
+            char* tmp_path = strdup(wd->path);
+            sprintf(wd->path, "%s/%s", tmp_path, token);
+            free(tmp_path);
+
+            int len = wd->index[wd->index[0]];
+            wd->index[++wd->index[0]] = len + strlen(token) + 1;  // +1 for '/'
+        }
+        token = strtok(NULL, "/");
+    }
+    free(tmp);
+
+    // 发送给客户端
+    sendn(task->fd, &send_status, sizeof(int));
+    int offset = wd->index[1] + 1;  // +1 for start position
+    printf("debug: %s\n", wd->path);
+    sprintf(msg, "~%s", wd->path + offset);
+    sendn(task->fd, msg, strlen(msg));
+
+    return 0;
 }
 
 void lsCmd(Task* task) {
@@ -226,9 +308,31 @@ void taskHandler(Task* task) {
     }
 }
 
-void workdirInit(WorkDir** workdir_table, int connfd) {
+void taskFree(Task* task) {
+    char* cur = *task->args;
+    while (cur != NULL) {
+        char* tmp = cur;
+        ++cur;
+        free(tmp);
+    }
+    free(task->args);
+    free(task);
+    // task->wd_table 在客户端断开时 free
+}
+
+void workdirInit(WorkDir** workdir_table, int connfd, char* username) {
     // TODO: error checking
     workdir_table[connfd] = (WorkDir*)malloc(sizeof(WorkDir));
     workdir_table[connfd]->path = (char*)malloc(MAXLINE * sizeof(char));
     workdir_table[connfd]->index = (int*)malloc(MAXLINE * sizeof(int));
+
+    strcpy(workdir_table[connfd]->path, username);
+    workdir_table[connfd]->index[0] = 1;
+    workdir_table[connfd]->index[1] = strlen(username) - 1;
+}
+
+void workdirFree(WorkDir* workdir) {
+    free(workdir->path);
+    free(workdir->index);
+    free(workdir);
 }
