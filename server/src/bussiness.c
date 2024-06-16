@@ -78,15 +78,19 @@ void sendFile(int sockfd, int fd) {
     close(fd);
 }
 
-void recvFile(int sockfd) {
+void recvFile(int sockfd, char* path) {
     // 接收文件名
     DataBlock block;
     bzero(&block, sizeof(block));
     recvn(sockfd, &block.length, sizeof(int));
     recvn(sockfd, block.data, block.length);
 
+    //拼接出path_file
+    char path_file[1000] = {0};
+    sprintf(path_file, "%s/%s", path, block.data);
+    printf("file == %s\n", path_file);
     // 打开文件
-    int fd = open(block.data, O_RDWR | O_TRUNC | O_CREAT, 0666);
+    int fd = open(path_file, O_RDWR | O_TRUNC | O_CREAT, 0666);
     if (fd == -1) {
         error(1, errno, "open");
     }
@@ -341,9 +345,8 @@ void getsCmd(Task* task) {
         DataBlock block;
         strcpy(block.data, *parameter);
         block.length = strlen(*parameter);
-        sendn(task->fd, &block, sizeof(int) + block.length);
-        sendFile(task->fd, fd);  // sendfile中close了fd
-        printf("hello world\n");
+        sendn(task->fd, &block, sizeof(int) + block.length);        
+        sendFile(task->fd, fd); //sendfile中close了fd
     }
     // 所有文件发送完毕
     int send_stat = 1;
@@ -356,7 +359,27 @@ void getsCmd(Task* task) {
 }
 
 void putsCmd(Task* task) {
-    // TODO:
+
+    //默认存放在当前目录
+    char path[1000] = {0};
+    WorkDir* pathbase = task->wd_table[task->fd];
+    strncpy(path, pathbase->path, pathbase->index[pathbase->index[0]] + 1);
+printf("path == %s\n", path);
+
+    for(int i = 0; true; i++){
+        //先接收是否要发送
+        int recv_stat = 0;
+        recv(task->fd, &recv_stat, sizeof(int), MSG_WAITALL);
+
+        //不发送
+        if(recv_stat == 1){
+printf("no file will puts\n");
+            break;
+        }
+        //要发送
+        recvFile(task->fd, path);
+printf("recv %d file\n", i);
+    }
 
     return;
 }
