@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #ifndef __NB_HEAD_H
 #define __NB_HEAD_H
 
