@@ -366,6 +366,10 @@ void putsCmd(Task* task) {
     strncpy(path, pathbase->path, pathbase->index[pathbase->index[0]] + 1);
 printf("path == %s\n", path);
 
+    //告诉客户端已就绪
+    int recv_stat = 0;
+    send(task->fd, &recv_stat, sizeof(int), MSG_NOSIGNAL);
+
     for(int i = 0; true; i++){
         //先接收是否要发送
         int recv_stat = 0;
@@ -376,7 +380,7 @@ printf("path == %s\n", path);
 printf("no file will puts\n");
             break;
         }
-        //要发送
+
         recvFile(task->fd, path);
 printf("recv %d file\n", i);
     }
