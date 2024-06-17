@@ -211,9 +211,16 @@ void getsCmd(int sockfd) {
 }
 
 void putsCmd(int sockfd, char** args){
+    //先等服务端就绪
+    int recv_stat = 0;
+    recv(sockfd, &recv_stat, sizeof(int), MSG_WAITALL);
+
+
     //参数错误
     if(args[1] == NULL){
         printf("parameter error\n");
+        int send_stat = 1;
+        send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
         return;
     }
     for(int i = 1; args[i]; i++){
@@ -229,7 +236,7 @@ void putsCmd(int sockfd, char** args){
         
         int send_stat = 0;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-printf("send stat %d", send_stat);
+printf("send stat %d\n", send_stat);
         //解析出文件名
         char filename[1000] = {0};
         for(char* p = args[i]; *p != '\0'; p++){
@@ -241,7 +248,7 @@ printf("send stat %d", send_stat);
             } //*p == '\0' || *p == '/'
         }
 
-        printf("%s\n", filename);
+printf("filename == %s\n", filename);
         // 先发文件名
         DataBlock block;
         strcpy(block.data, filename);
@@ -250,7 +257,7 @@ printf("send stat %d", send_stat);
 
         //发送文件
         sendFile(sockfd, fd);
-        printf("puts no %d\n", i);
+printf("puts no %d\n", i);
     }
     int send_stat = 1;
     send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);

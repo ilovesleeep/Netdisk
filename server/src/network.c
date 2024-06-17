@@ -110,7 +110,7 @@ void epollAdd(int epfd, int fd) {
     event.events = EPOLLIN;
     event.data.fd = fd;
     if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &event) == -1) {
-        error(1, errno, "epoll_ctl");
+        error(1, errno, "epoll_ctl_add");
     }
 }
 
