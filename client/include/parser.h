@@ -1,7 +1,7 @@
-#ifndef __K_PARSER_H
-#define __K_PARSER_H
+#ifndef __NB_PARSER_H
+#define __NB_PARSER_H
 
-#include <func.h>
+#include "head.h"
 
 typedef struct {
     int port;
@@ -19,7 +19,6 @@ typedef enum {
     CMD_EXIT,
     CMD_UNKNOWN,
 } Command;
-
 
 char** parseRequest(const char* req);
 void argsFree(char** args);

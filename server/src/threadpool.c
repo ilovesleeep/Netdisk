@@ -17,7 +17,7 @@ void* eventLoop(void* arg) {
 
         // 处理业务
         int connfd = task->fd;
-        epollMod(pool->epfd, task->fd, 0);
+        epollMod(pool->epfd, task->fd, EPOLLHUP);
         printf("[INFO] %lu Da! For mother China!\n", tid);
 
         char buf[MAXLINE];

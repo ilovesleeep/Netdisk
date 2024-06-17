@@ -141,9 +141,10 @@ void recvFile(int sockfd) {
     close(fd);
 }
 
-int cdCmd(int sockfd, char* buf, char* cwd, int* recv_status) {
-    recv(sockfd, recv_status, sizeof(int), 0);
-    if (*recv_status) {
+int cdCmd(int sockfd, char* buf, char* cwd) {
+    int recv_stat = 0;
+    recvn(sockfd, &recv_stat, sizeof(int));
+    if (recv_stat) {
         recv(sockfd, buf, MAXLINE, 0);
         printf("Error: %s\n", buf);
         return -1;
@@ -225,15 +226,5 @@ void mkdirCmd(int sockfd, char* buf) {
     if (strcmp(buf, "0") != 0) {
         puts(buf);
     }
-    return;
-}
-
-void exitCmd(char* buf) {
-    strcpy(buf, "I will miss you");
-    return;
-}
-
-void unknownCmd(char* buf) {
-    strcpy(buf, "What can I say");
     return;
 }

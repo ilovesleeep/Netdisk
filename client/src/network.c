@@ -29,9 +29,8 @@ int tcpConnect(const char* host, const char* port) {
     freeaddrinfo(res);
 
     if (cur == NULL) {
-        error(1, 0, "connect to %s:%s failed", host, port);
+        error(1, 0, "[ERROR] Connect to %s:%s failed", host, port);
     }
-    printf("[INFO] established with %s:%s\n", host, port);
 
     return sockfd;
 }
