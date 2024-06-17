@@ -17,6 +17,13 @@ char** parseRequest(const char* req) {
     }
     free(tmp);
 
+    if (i == 0) {
+        // 空命令
+        args[0] =
+            (char*)calloc(strlen("NULL") + 1, sizeof(char));  // +1 for '\0'
+        strcpy(args[0], "NULL");
+    }
+
     // 安全考虑，防止越界
     args[MAXARGS - 1] = NULL;
     return args;
