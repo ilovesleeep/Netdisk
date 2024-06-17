@@ -545,6 +545,11 @@ void mkdirCmd(Task* task) {
     return;
 }
 
+void unknownCmd(void) {
+    printf("[WARN] unknownCmd\n");
+    return;
+}
+
 void taskHandler(Task* task) {
     switch (getCommand(task->args[0])) {
         case CMD_CD:
@@ -568,11 +573,8 @@ void taskHandler(Task* task) {
         case CMD_PUTS:
             putsCmd(task);
             break;
-        case CMD_EXIT:
-            exitCmd(task);
-            break;
         default:
-            unknownCmd(task);
+            unknownCmd();
             break;
     }
 }
