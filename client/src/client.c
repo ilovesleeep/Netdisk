@@ -108,6 +108,7 @@ int sessionHandler(int sockfd, char* host, char* username) {
                 lsCmd(sockfd);
                 break;
             case CMD_RM:
+                rmCmd(sockfd,buf);
                 break;
             case CMD_PWD:
                 recv(sockfd, buf, MAXLINE, 0);
@@ -117,6 +118,7 @@ int sessionHandler(int sockfd, char* host, char* username) {
                 getsCmd(sockfd);
                 break;
             case CMD_PUTS:
+                putsCmd(sockfd, args);
                 break;
             case CMD_MKDIR:
                 mkdirCmd(sockfd, buf);

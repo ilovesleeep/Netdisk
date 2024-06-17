@@ -1,10 +1,9 @@
-#ifndef __K_THREAD_POOL_H
-#define __K_THREAD_POOL_H
-
-#include <func.h>
+#ifndef __NB_THREAD_POOL_H
+#define __NB_THREAD_POOL_H
 
 #include "blockq.h"
 #include "bussiness.h"
+#include "head.h"
 #include "network.h"
 
 typedef struct {

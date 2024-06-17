@@ -1,7 +1,7 @@
-#ifndef __K_NETWORK_H
-#define __K_NETWORK_H
+#ifndef __NB_NETWORK_H
+#define __NB_NETWORK_H
 
-#include <func.h>
+#include "head.h"
 
 int tcpListen(int port);
 
