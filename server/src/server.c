@@ -16,8 +16,6 @@ int serverMain(void) {
         case -1:
             error(1, errno, "fork");
         case 0:
-            break;
-        default:
             // 父进程
             printf("[INFO] %d Parent porcess reporting\n", getpid());
             close(g_exit_pipe[0]);
@@ -28,6 +26,8 @@ int serverMain(void) {
             // 等待子进程结束
             wait(NULL);
             exit(0);
+        default:
+            break;
     }
     // 子进程
     printf("[INFO] %d Child process reporting\n", getpid());
@@ -72,6 +72,7 @@ int serverMain(void) {
 
                 // 添加到 epoll
                 epollAdd(epfd, connfd);
+                epollMod(epfd, connfd, EPOLLIN | EPOLLONESHOT);
 
                 // 初始化 workdir
                 char username[] = "user";
@@ -83,6 +84,7 @@ int serverMain(void) {
 
             } else {
                 // 客户端发过来请求
+
                 requestHandler(ready_events[i].data.fd, pool, workdir_table);
             }
         }

@@ -16,8 +16,11 @@ void* eventLoop(void* arg) {
         }
 
         // 处理业务
+
         int connfd = task->fd;
-        epollMod(pool->epfd, task->fd, EPOLLHUP);
+        // epollMod(pool->epfd, task->fd, 0);
+        // epollDel(pool->epfd, task->fd);
+
         printf("[INFO] %lu Da! For mother China!\n", tid);
 
         char buf[MAXLINE];
@@ -26,7 +29,8 @@ void* eventLoop(void* arg) {
         taskFree(task);
 
         printf("[INFO] %lu Ura! Waiting orders.\n", tid);
-        epollMod(pool->epfd, connfd, EPOLLIN);
+
+        epollMod(pool->epfd, connfd, EPOLLIN | EPOLLONESHOT);
     }
 }
 

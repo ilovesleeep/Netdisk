@@ -1,9 +1,8 @@
-#ifndef __K_BLOCKQ_H
-#define __K_BLOCKQ_H
-
-#include <func.h>
+#ifndef __NB_BLOCKQ_H
+#define __NB_BLOCKQ_H
 
 #include "bussiness.h"
+#include "head.h"
 
 #define N 1024
 
