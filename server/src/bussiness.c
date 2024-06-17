@@ -27,11 +27,18 @@ int sendn(int fd, void* buf, int length) {
 }
 
 int recvn(int fd, void* buf, int length) {
+    int i = 0;
+
     int bytes = 0;
     while (bytes < length) {
         int n = recv(fd, (char*)buf + bytes, length - bytes, 0);
         if (n < 0) {
             return -1;
+        }
+        if (n == 0) {
+            if(++i == 1000){    //如果接收了1000次0长度的信息，那对端一定是关闭了，要么就是网太差，直接踢出去
+                return -1;
+            }
         }
 
         bytes += n;
@@ -40,12 +47,15 @@ int recvn(int fd, void* buf, int length) {
     return 0;
 }
 
-void sendFile(int sockfd, int fd) {
+int sendFile(int sockfd, int fd) {
     // 发送文件大小
     struct stat statbuf;
     fstat(fd, &statbuf);
     off_t fsize = statbuf.st_size;
     sendn(sockfd, &fsize, sizeof(fsize));
+
+    //接收客户端本文件的大小及哈希值
+
 
     // 发送文件内容
     off_t sent_bytes = 0;
@@ -57,7 +67,10 @@ void sendFile(int sockfd, int fd) {
 
             void* addr =
                 mmap(NULL, length, PROT_READ, MAP_SHARED, fd, sent_bytes);
-            sendn(sockfd, addr, length);
+            if(sendn(sockfd, addr, length) == -1){
+                close(fd);
+                return 1;
+            }
             munmap(addr, length);
 
             sent_bytes += length;
@@ -70,20 +83,26 @@ void sendFile(int sockfd, int fd) {
                 fsize - sent_bytes >= BUFSIZE ? BUFSIZE : fsize - sent_bytes;
 
             read(fd, buf, length);
-            sendn(sockfd, buf, length);
+            if(sendn(sockfd, buf, length) == -1){
+                close(fd);
+                return 1;
+            }
 
             sent_bytes += length;
         }
     }
     close(fd);
+    return 0;
 }
 
-void recvFile(int sockfd, char* path) {
+int recvFile(int sockfd, char* path) {
     // 接收文件名
     DataBlock block;
     bzero(&block, sizeof(block));
     recvn(sockfd, &block.length, sizeof(int));
-    recvn(sockfd, block.data, block.length);
+    if(recvn(sockfd, block.data, block.length) == -1){
+        return 1;
+    }
 
     //拼接出path_file
     char path_file[1000] = {0};
@@ -110,7 +129,10 @@ void recvFile(int sockfd, char* path) {
                                : fsize - recv_bytes;
             void* addr = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED,
                               fd, recv_bytes);
-            recvn(sockfd, addr, length);
+            if(recvn(sockfd, addr, length) == -1){
+                close(fd);
+                return 1;
+            }
             munmap(addr, length);
 
             recv_bytes += length;
@@ -123,7 +145,10 @@ void recvFile(int sockfd, char* path) {
         while (recv_bytes < fsize) {
             off_t length =
                 (fsize - recv_bytes >= BUFSIZE) ? BUFSIZE : fsize - recv_bytes;
-            recvn(sockfd, buf, length);
+            if(recvn(sockfd, buf, length) == -1){
+                close(fd);
+                return 1;
+            }
             write(fd, buf, length);
 
             recv_bytes += length;
@@ -134,6 +159,7 @@ void recvFile(int sockfd, char* path) {
     }
     printf("[INFO] downloading %5.2lf%%\n", 100.0);
     close(fd);
+    return 0;
 }
 
 int cdCmd(Task* task) {
@@ -346,7 +372,9 @@ void getsCmd(Task* task) {
         strcpy(block.data, *parameter);
         block.length = strlen(*parameter);
         sendn(task->fd, &block, sizeof(int) + block.length);        
-        sendFile(task->fd, fd); //sendfile中close了fd
+        if(sendFile(task->fd, fd) == 1) {//sendfile中close了fd,若返回值为1证明连接中断,则不进行剩余发送任务
+            return;
+        }
     }
     // 所有文件发送完毕
     int send_stat = 1;
@@ -372,14 +400,18 @@ void putsCmd(Task* task) {
     for(int i = 0; true; i++){
         //先接收是否要发送
         int recv_stat = 0;
-        recv(task->fd, &recv_stat, sizeof(int), MSG_WAITALL);
-
-        //不发送
-        if(recv_stat == 1){
+        if(recv(task->fd, &recv_stat, sizeof(int), MSG_WAITALL) == -1){
             break;
         }
 
-        recvFile(task->fd, path);
+        //不发送
+        if(recv_stat != 0){
+            break;
+        }
+
+        if(recvFile(task->fd, path) == 1){
+            break;
+        }
     }
 
     return;
