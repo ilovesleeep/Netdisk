@@ -1,4 +1,4 @@
-#include "log.h"
+#include "../include/log.h"
 #define MAX_CALLBACKS 32
 #define LOG_USE_COLOR 1
 #define MAXLINE 1024
