@@ -292,12 +292,15 @@ void lsCmd(Task* task) {
     return;
 }
 
-// rm -r
-void deleteDir(const char* dir) {
+// 使用单独的函数来实现命令的功能
+int deleteDir(const char* dir) {
     // 打开目录
     DIR* stream = opendir(dir);
     if (stream == NULL) {
-        error(1, errno, "opendir %s", dir);
+        if (errno == ENOENT) {
+            fprintf(stderr, "rm: 无法删除'%s' : 没有那个文件或者目录\n", dir);
+            return errno;
+        }
     }
 
     // 遍历目录流，依次删除每一个目录项
@@ -329,6 +332,8 @@ void deleteDir(const char* dir) {
     }
     // 再删除该目录
     rmdir(dir);
+
+    return 0;
 }
 
 void rmCmd(Task* task) {
@@ -361,19 +366,16 @@ void rmCmd(Task* task) {
 
     if (remove(dir) == 0) {
         printf("Successfully deleted %s\n", dir);
-    } else if (remove(dir) == -1 || rmdir(dir) == -1) {
-        // 检查是否是因为目录不存在导致的错误
-        if (errno == ENOENT) {
-            fprintf(stderr, "Error: The directory '%s' doesn't exist.\n", dir);
-        } else {
-            // 打印其他错误
-            fprintf(stderr, "Error: Unable to remove directory '%s':%s\n", dir,
-                    strerror(errno));
-            return;
-        }
-    } else {
-        deleteDir(dir);
+    } else if (deleteDir(dir) == 0) {
+        printf("Successfully deleted %s\n", dir);
     }
+    /*else{
+        //检查是否是因为目录不存在导致的错误
+        if(errno == ENOENT){
+            fprintf(stderr,"Error: The directory '%s' doesn't exist.\n",dir);
+        }
+    }
+*/
     // send(task->fd,"0",sizeof("0"),0);
     //} else {
     //   perror("Error deleting file");
