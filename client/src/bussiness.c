@@ -274,6 +274,14 @@ void mkdirCmd(int sockfd, char* buf) {
     return;
 }
 
+void rmCmd(int sockfd,char *buf){
+    recv(sockfd,buf,MAXLINE,0);
+    if(strcmp(buf,"0") != 0){
+        puts(buf);
+    }
+    return;
+}
+
 void exitCmd(char* buf) {
     strcpy(buf, "I will miss you");
     return;

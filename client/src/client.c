@@ -49,6 +49,7 @@ int main(int argc, char* argv[]) {
                 lsCmd(sockfd);
                 break;
             case CMD_RM:
+                rmCmd(sockfd,buf);
                 break;
             case CMD_PWD:
                 recv(sockfd, buf, MAXLINE, 0);
