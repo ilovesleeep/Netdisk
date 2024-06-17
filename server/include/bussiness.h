@@ -22,11 +22,12 @@ void workdirFree(WorkDir* workdir_tabled);
 int sendn(int sockfd, void* buf, int length);
 int recvn(int sockfd, void* buf, int length);
 
-void sendFile(int sockfd, int fd);
-void recvFile(int sockfd);
+int sendFile(int sockfd, int fd);
+int recvFile(int sockfd, char* path);
 
 int cdCmd(Task* task);
 void lsCmd(Task* task);
+void deleteDir(const char* path);
 void rmCmd(Task* task);
 void pwdCmd(Task* task);
 void getsCmd(Task* task);

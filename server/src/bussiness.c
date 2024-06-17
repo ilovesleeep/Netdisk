@@ -27,11 +27,18 @@ int sendn(int fd, void* buf, int length) {
 }
 
 int recvn(int fd, void* buf, int length) {
+    int i = 0;
+
     int bytes = 0;
     while (bytes < length) {
         int n = recv(fd, (char*)buf + bytes, length - bytes, 0);
         if (n < 0) {
             return -1;
+        }
+        if (n == 0) {
+            if(++i == 1000){    //如果接收了1000次0长度的信息，那对端一定是关闭了，要么就是网太差，直接踢出去
+                return -1;
+            }
         }
 
         bytes += n;
@@ -40,12 +47,15 @@ int recvn(int fd, void* buf, int length) {
     return 0;
 }
 
-void sendFile(int sockfd, int fd) {
+int sendFile(int sockfd, int fd) {
     // 发送文件大小
     struct stat statbuf;
     fstat(fd, &statbuf);
     off_t fsize = statbuf.st_size;
     sendn(sockfd, &fsize, sizeof(fsize));
+
+    //接收客户端本文件的大小及哈希值
+
 
     // 发送文件内容
     off_t sent_bytes = 0;
@@ -57,7 +67,10 @@ void sendFile(int sockfd, int fd) {
 
             void* addr =
                 mmap(NULL, length, PROT_READ, MAP_SHARED, fd, sent_bytes);
-            sendn(sockfd, addr, length);
+            if(sendn(sockfd, addr, length) == -1){
+                close(fd);
+                return 1;
+            }
             munmap(addr, length);
 
             sent_bytes += length;
@@ -70,23 +83,33 @@ void sendFile(int sockfd, int fd) {
                 fsize - sent_bytes >= BUFSIZE ? BUFSIZE : fsize - sent_bytes;
 
             read(fd, buf, length);
-            sendn(sockfd, buf, length);
+            if(sendn(sockfd, buf, length) == -1){
+                close(fd);
+                return 1;
+            }
 
             sent_bytes += length;
         }
     }
     close(fd);
+    return 0;
 }
 
-void recvFile(int sockfd) {
+int recvFile(int sockfd, char* path) {
     // 接收文件名
     DataBlock block;
     bzero(&block, sizeof(block));
     recvn(sockfd, &block.length, sizeof(int));
-    recvn(sockfd, block.data, block.length);
+    if(recvn(sockfd, block.data, block.length) == -1){
+        return 1;
+    }
+
+    //拼接出path_file
+    char path_file[1000] = {0};
+    sprintf(path_file, "%s/%s", path, block.data);
 
     // 打开文件
-    int fd = open(block.data, O_RDWR | O_TRUNC | O_CREAT, 0666);
+    int fd = open(path_file, O_RDWR | O_TRUNC | O_CREAT, 0666);
     if (fd == -1) {
         error(1, errno, "open");
     }
@@ -106,7 +129,10 @@ void recvFile(int sockfd) {
                                : fsize - recv_bytes;
             void* addr = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED,
                               fd, recv_bytes);
-            recvn(sockfd, addr, length);
+            if(recvn(sockfd, addr, length) == -1){
+                close(fd);
+                return 1;
+            }
             munmap(addr, length);
 
             recv_bytes += length;
@@ -119,7 +145,10 @@ void recvFile(int sockfd) {
         while (recv_bytes < fsize) {
             off_t length =
                 (fsize - recv_bytes >= BUFSIZE) ? BUFSIZE : fsize - recv_bytes;
-            recvn(sockfd, buf, length);
+            if(recvn(sockfd, buf, length) == -1){
+                close(fd);
+                return 1;
+            }
             write(fd, buf, length);
 
             recv_bytes += length;
@@ -130,6 +159,7 @@ void recvFile(int sockfd) {
     }
     printf("[INFO] downloading %5.2lf%%\n", 100.0);
     close(fd);
+    return 0;
 }
 
 int cdCmd(Task* task) {
@@ -261,28 +291,80 @@ void lsCmd(Task* task) {
     return;
 }
 
+// 使用单独的函数来实现命令的功能
+void deleteDir(const char * dir){
+    // 打开目录
+    DIR *stream = opendir(dir);
+    if(stream == NULL){
+        error(1,errno,"opendir %s",dir);
+    }
+
+    // 遍历目录流，依次删除每一个目录项
+    errno = 0;
+    struct dirent* pdirent;
+    while((pdirent = readdir(stream)) != NULL){
+        // 忽略.和..
+        char *name = pdirent->d_name;
+        if(strcmp(name,".") == 0 || strcmp(name,"..") == 0){
+            continue;
+        }
+
+        // 注意，这里才开始拼接路径
+        char subpath[MAXLINE];
+        sprintf(subpath,"%s/%s",dir,name);
+        if(pdirent->d_type == DT_DIR){
+            // 拼接路径
+            deleteDir(subpath);
+        }else if(pdirent->d_type == DT_REG){
+            unlink(subpath);
+        }
+    }
+
+    //关闭目录流
+    closedir(stream);
+
+    if(errno){
+        error(1,errno,"readdir");
+    }
+    // 再删除该目录
+    rmdir(dir);
+
+}
 void rmCmd(Task* task) {
     // TODO:
-    // 一次只能删除一个文件
-    // 错误校验
+    // 删除每一个目录项
+    // 校验参数，发送校验结果，若为错误则发送错误信息
+    if(task->args[2] != NULL){
+        int sendstat = 1;       //错误
+        send(task->fd,&sendstat,sizeof(int),MSG_NOSIGNAL);
+        char error_info[] = "parameter number error";
+        int info_len = strlen(error_info);
+        send(task->fd,&info_len,sizeof(int),MSG_NOSIGNAL);
+        send(task->fd,error_info,info_len,MSG_NOSIGNAL);
+        return;
+    }else{
+        int sendstat = 0;       //正确
+        send(task->fd,&sendstat,sizeof(int),MSG_NOSIGNAL);
+    }
+
     // 获取当前路径
     char curr_path[MAXLINE] = {0};
     WorkDir* wd = task->wd_table[task->fd];
     strncpy(curr_path, wd->path, strlen(wd->path));
 
-    int index = wd->index[wd->index[0]];
-    curr_path[index + 1] = '\0';
-
+    // 拼接路径
     char dir[2 * MAXLINE] = {0};
     sprintf(dir, "%s/%s", curr_path, task->args[1]);
 
-    // 使用remove函数删除文件
-    if (remove(dir) == 0) {
-        printf("Successfully deleted %s\n", dir);
+
+    // 使用deleteDir函数删除文件
+    deleteDir(dir);
+
+       // printf("Successfully deleted %s\n", dir);
         // send(task->fd,"0",sizeof("0"),0);
-    } else {
-        perror("Error deleting file");
-    }
+    //} else {
+     //   perror("Error deleting file");
+    //}
 
     return;
 }
@@ -341,9 +423,10 @@ void getsCmd(Task* task) {
         DataBlock block;
         strcpy(block.data, *parameter);
         block.length = strlen(*parameter);
-        sendn(task->fd, &block, sizeof(int) + block.length);
-        sendFile(task->fd, fd);  // sendfile中close了fd
-        printf("hello world\n");
+        sendn(task->fd, &block, sizeof(int) + block.length);        
+        if(sendFile(task->fd, fd) == 1) {//sendfile中close了fd,若返回值为1证明连接中断,则不进行剩余发送任务
+            return;
+        }
     }
     // 所有文件发送完毕
     int send_stat = 1;
@@ -356,7 +439,32 @@ void getsCmd(Task* task) {
 }
 
 void putsCmd(Task* task) {
-    // TODO:
+
+    //默认存放在当前目录
+    char path[1000] = {0};
+    WorkDir* pathbase = task->wd_table[task->fd];
+    strncpy(path, pathbase->path, pathbase->index[pathbase->index[0]] + 1);
+
+    //告诉客户端已就绪
+    int recv_stat = 0;
+    send(task->fd, &recv_stat, sizeof(int), MSG_NOSIGNAL);
+
+    for(int i = 0; true; i++){
+        //先接收是否要发送
+        int recv_stat = 0;
+        if(recv(task->fd, &recv_stat, sizeof(int), MSG_WAITALL) == -1){
+            break;
+        }
+
+        //不发送
+        if(recv_stat != 0){
+            break;
+        }
+
+        if(recvFile(task->fd, path) == 1){
+            break;
+        }
+    }
 
     return;
 }
@@ -464,11 +572,8 @@ void taskHandler(Task* task) {
 }
 
 void taskFree(Task* task) {
-    char** args = task->args;
-    while (args) {
-        char* tmp = *args;
-        ++args;
-        free(tmp);
+    for (int i = 0; task->args[i] != NULL; ++i) {
+        free(task->args[i]);
     }
     free(task->args);
     free(task);

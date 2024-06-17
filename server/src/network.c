@@ -110,8 +110,17 @@ void epollAdd(int epfd, int fd) {
     event.events = EPOLLIN;
     event.data.fd = fd;
     if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &event) == -1) {
-        error(1, errno, "epoll_ctl");
+        error(1, errno, "epoll_ctl_add");
     }
 }
 
 void epollDel(int epfd, int fd) { epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL); }
+
+void epollMod(int epfd, int fd, enum EPOLL_EVENTS mode) {
+    struct epoll_event event;
+    event.events = mode;
+    event.data.fd = fd;
+    if (epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &event) == -1) {
+        error(1, errno, "epoll_ctl");
+    }
+}
