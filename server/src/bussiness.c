@@ -374,6 +374,11 @@ void rmCmd(Task* task) {
 
 void pwdCmd(Task* task) {
     // TODO:
+    char path[MAXLINE] = {0};
+    WorkDir* wd = task->wd_table[task->fd];
+    strncpy(path, wd->path, strlen(wd->path));
+
+    sendn(task->fd, path, sizeof(path));
 
     return;
 }
