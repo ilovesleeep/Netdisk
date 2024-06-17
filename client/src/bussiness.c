@@ -38,17 +38,7 @@ int recvn(int fd, void* buf, int length) {
     return 0;
 }
 
-void sendFile(int sockfd, const char* path) {
-    int fd = open(path, O_RDONLY);
-    if (fd == -1) {
-        error(1, errno, "open %s", path);
-    }
-
-    // 先发文件名
-    DataBlock block;
-    strcpy(block.data, path);
-    block.length = strlen(path);
-    sendn(sockfd, &block, sizeof(int) + block.length);
+void sendFile(int sockfd, int fd) {
 
     // 发送文件大小
     struct stat statbuf;
@@ -220,9 +210,73 @@ void getsCmd(int sockfd) {
     return;
 }
 
+void putsCmd(int sockfd, char** args){
+    //先等服务端就绪
+    int recv_stat = 0;
+    recv(sockfd, &recv_stat, sizeof(int), MSG_WAITALL);
+
+
+    //参数错误
+    if(args[1] == NULL){
+        printf("parameter error\n");
+        int send_stat = 1;
+        send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+        return;
+    }
+    for(int i = 1; args[i]; i++){
+        //统一先发送是否要发送，0为要发送，1为不发送
+        //有文件则发送0，路径错误或发送完成则发送1
+        int fd = open(args[i], O_RDWR);
+        if(fd == -1){
+            int send_stat = 1;
+            send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+            printf("path error : no find NO.%d file\n", i);
+            return;
+        }
+        
+        int send_stat = 0;
+        send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+
+        //解析出文件名
+        char filename[1000] = {0};
+        for(char* p = args[i]; *p != '\0'; p++){
+            for(char* start = p; *p != '/'; p++){
+                if(*(p+1) == '\0'){
+                    strcpy(filename, start);
+                    break;
+                }
+            } //*p == '\0' || *p == '/'
+        }
+
+
+        // 先发文件名
+        DataBlock block;
+        strcpy(block.data, filename);
+        block.length = strlen(filename);
+        sendn(sockfd, &block, sizeof(int) + block.length);
+
+        //发送文件
+        sendFile(sockfd, fd);
+
+    }
+    int send_stat = 1;
+    send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+    printf("puts success\n");
+    return;
+
+}
+
 void mkdirCmd(int sockfd, char* buf) {
     recv(sockfd, buf, MAXLINE, 0);
     if (strcmp(buf, "0") != 0) {
+        puts(buf);
+    }
+    return;
+}
+
+void rmCmd(int sockfd,char *buf){
+    recv(sockfd,buf,MAXLINE,0);
+    if(strcmp(buf,"0") != 0){
         puts(buf);
     }
     return;

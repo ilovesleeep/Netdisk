@@ -16,25 +16,33 @@ void* eventLoop(void* arg) {
         }
 
         // 处理业务
-        
+
+        int connfd = task->fd;
+        epollMod(pool->epfd, task->fd, 0);
+        // epollDel(pool->epfd, task->fd);
+
         printf("[INFO] %lu Da! For mother China!\n", tid);
 
         char buf[MAXLINE];
         bzero(buf, MAXLINE);
         taskHandler(task);
-        // taskFree(task);
-        free(task);
+        taskFree(task);
 
         printf("[INFO] %lu Ura! Waiting orders.\n", tid);
+
+        
+        epollMod(pool->epfd, connfd, EPOLLIN);
+        // epollAdd(pool->epfd, connfd);
 
     }
 }
 
-ThreadPool* createThreadPool(int n) {
+ThreadPool* createThreadPool(int n, int epfd) {
     ThreadPool* pool = (ThreadPool*)malloc(sizeof(ThreadPool));
     pool->threads = (pthread_t*)calloc(n, sizeof(pthread_t));
     pool->num_threads = n;
     pool->task_queue = blockqCreate();
+    pool->epfd = epfd;
 
     // 创建线程
     for (int i = 0; i < n; i++) {

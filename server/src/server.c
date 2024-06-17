@@ -16,8 +16,6 @@ int serverMain(void) {
         case -1:
             error(1, errno, "fork");
         case 0:
-            break;
-        default:
             // 父进程
             printf("[INFO] %d Parent porcess reporting\n", getpid());
             close(g_exit_pipe[0]);
@@ -28,6 +26,8 @@ int serverMain(void) {
             // 等待子进程结束
             wait(NULL);
             exit(0);
+        default:
+            break;
     }
     // 子进程
     printf("[INFO] %d Child process reporting\n", getpid());
@@ -37,14 +37,14 @@ int serverMain(void) {
     ServerConfig conf = {8080, 2};
     parseConfig(&conf);
 
-    // 创建线程池
-    ThreadPool* pool = createThreadPool(conf.num_threads);
-
     // epoll
     int epfd = epoll_create(1);
 
     // g_exit_pipe 读端加入 epoll
     epollAdd(epfd, g_exit_pipe[0]);
+
+    // 创建线程池
+    ThreadPool* pool = createThreadPool(conf.num_threads, epfd);
 
     // 监听端口
     int listenfd = tcpListen(conf.port);
@@ -79,7 +79,7 @@ int serverMain(void) {
 
             } else if (ready_events[i].data.fd == g_exit_pipe[0]) {
                 // 父进程传来退出信号
-                serverExit(pool);
+//                serverExit(pool);
 
             } else {
                 // 客户端发过来请求
