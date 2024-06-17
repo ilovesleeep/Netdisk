@@ -265,28 +265,80 @@ void lsCmd(Task* task) {
     return;
 }
 
+// 使用单独的函数来实现命令的功能
+void deleteDir(const char * dir){
+    // 打开目录
+    DIR *stream = opendir(dir);
+    if(stream == NULL){
+        error(1,errno,"opendir %s",dir);
+    }
+
+    // 遍历目录流，依次删除每一个目录项
+    errno = 0;
+    struct dirent* pdirent;
+    while((pdirent = readdir(stream)) != NULL){
+        // 忽略.和..
+        char *name = pdirent->d_name;
+        if(strcmp(name,".") == 0 || strcmp(name,"..") == 0){
+            continue;
+        }
+
+        // 注意，这里才开始拼接路径
+        char subpath[MAXLINE];
+        sprintf(subpath,"%s/%s",dir,name);
+        if(pdirent->d_type == DT_DIR){
+            // 拼接路径
+            deleteDir(subpath);
+        }else if(pdirent->d_type == DT_REG){
+            unlink(subpath);
+        }
+    }
+
+    //关闭目录流
+    closedir(stream);
+
+    if(errno){
+        error(1,errno,"readdir");
+    }
+    // 再删除该目录
+    rmdir(dir);
+
+}
 void rmCmd(Task* task) {
     // TODO:
-    // 一次只能删除一个文件
-    // 错误校验
+    // 删除每一个目录项
+    // 校验参数，发送校验结果，若为错误则发送错误信息
+    if(task->args[2] != NULL){
+        int sendstat = 1;       //错误
+        send(task->fd,&sendstat,sizeof(int),MSG_NOSIGNAL);
+        char error_info[] = "parameter number error";
+        int info_len = strlen(error_info);
+        send(task->fd,&info_len,sizeof(int),MSG_NOSIGNAL);
+        send(task->fd,error_info,info_len,MSG_NOSIGNAL);
+        return;
+    }else{
+        int sendstat = 0;       //正确
+        send(task->fd,&sendstat,sizeof(int),MSG_NOSIGNAL);
+    }
+
     // 获取当前路径
     char curr_path[MAXLINE] = {0};
     WorkDir* wd = task->wd_table[task->fd];
     strncpy(curr_path, wd->path, strlen(wd->path));
 
-    int index = wd->index[wd->index[0]];
-    curr_path[index + 1] = '\0';
-
+    // 拼接路径
     char dir[2 * MAXLINE] = {0};
     sprintf(dir, "%s/%s", curr_path, task->args[1]);
 
-    // 使用remove函数删除文件
-    if (remove(dir) == 0) {
-        printf("Successfully deleted %s\n", dir);
+
+    // 使用deleteDir函数删除文件
+    deleteDir(dir);
+
+       // printf("Successfully deleted %s\n", dir);
         // send(task->fd,"0",sizeof("0"),0);
-    } else {
-        perror("Error deleting file");
-    }
+    //} else {
+     //   perror("Error deleting file");
+    //}
 
     return;
 }
