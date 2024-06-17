@@ -83,7 +83,10 @@ int serverMain(void) {
 
             } else {
                 // 客户端发过来请求
+
                 requestHandler(ready_events[i].data.fd, pool, workdir_table);
+                
+
             }
         }
     }

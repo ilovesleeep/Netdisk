@@ -16,6 +16,7 @@ void* eventLoop(void* arg) {
         }
 
         // 处理业务
+        
         printf("[INFO] %lu Da! For mother China!\n", tid);
 
         char buf[MAXLINE];
@@ -25,6 +26,7 @@ void* eventLoop(void* arg) {
         free(task);
 
         printf("[INFO] %lu Ura! Waiting orders.\n", tid);
+
     }
 }
 
