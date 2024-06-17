@@ -32,8 +32,7 @@ void pwdCmd(Task* task);
 void getsCmd(Task* task);
 void putsCmd(Task* task);
 void mkdirCmd(Task* task);
-void exitCmd(Task* task);
-void unknownCmd(Task* task);
+void unknownCmd(void);
 
 void taskHandler(Task* task);
 void taskFree(Task* task);
