@@ -107,6 +107,7 @@ int recvFile(int sockfd, char* path) {
     //拼接出path_file
     char path_file[1000] = {0};
     sprintf(path_file, "%s/%s", path, block.data);
+    printf("%s\n",block.data);
 
     // 打开文件
     int fd = open(path_file, O_RDWR | O_TRUNC | O_CREAT, 0666);
@@ -358,9 +359,11 @@ void rmCmd(Task* task) {
 
 
     // 使用deleteDir函数删除文件
+    if(remove(dir) == 0){
+       printf("Successfully deleted %s\n", dir);
+    }else{
     deleteDir(dir);
-
-       // printf("Successfully deleted %s\n", dir);
+    }
         // send(task->fd,"0",sizeof("0"),0);
     //} else {
      //   perror("Error deleting file");
