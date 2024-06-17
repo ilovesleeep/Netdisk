@@ -16,8 +16,6 @@ int serverMain(void) {
         case -1:
             error(1, errno, "fork");
         case 0:
-            break;
-        default:
             // 父进程
             printf("[INFO] %d Parent porcess reporting\n", getpid());
             close(g_exit_pipe[0]);
@@ -28,6 +26,8 @@ int serverMain(void) {
             // 等待子进程结束
             wait(NULL);
             exit(0);
+        default:
+            break;
     }
     // 子进程
     printf("[INFO] %d Child process reporting\n", getpid());
@@ -79,7 +79,7 @@ int serverMain(void) {
 
             } else if (ready_events[i].data.fd == g_exit_pipe[0]) {
                 // 父进程传来退出信号
-                serverExit(pool);
+//                serverExit(pool);
 
             } else {
                 // 客户端发过来请求
