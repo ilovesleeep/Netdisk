@@ -88,7 +88,7 @@ void recvFile(int sockfd, char* path) {
     //拼接出path_file
     char path_file[1000] = {0};
     sprintf(path_file, "%s/%s", path, block.data);
-    printf("file == %s\n", path_file);
+
     // 打开文件
     int fd = open(path_file, O_RDWR | O_TRUNC | O_CREAT, 0666);
     if (fd == -1) {
@@ -364,7 +364,6 @@ void putsCmd(Task* task) {
     char path[1000] = {0};
     WorkDir* pathbase = task->wd_table[task->fd];
     strncpy(path, pathbase->path, pathbase->index[pathbase->index[0]] + 1);
-printf("path == %s\n", path);
 
     //告诉客户端已就绪
     int recv_stat = 0;
@@ -377,12 +376,10 @@ printf("path == %s\n", path);
 
         //不发送
         if(recv_stat == 1){
-printf("no file will puts\n");
             break;
         }
 
         recvFile(task->fd, path);
-printf("recv %d file\n", i);
     }
 
     return;

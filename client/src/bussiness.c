@@ -236,7 +236,7 @@ void putsCmd(int sockfd, char** args){
         
         int send_stat = 0;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-printf("send stat %d\n", send_stat);
+
         //解析出文件名
         char filename[1000] = {0};
         for(char* p = args[i]; *p != '\0'; p++){
@@ -248,7 +248,7 @@ printf("send stat %d\n", send_stat);
             } //*p == '\0' || *p == '/'
         }
 
-printf("filename == %s\n", filename);
+
         // 先发文件名
         DataBlock block;
         strcpy(block.data, filename);
@@ -257,7 +257,7 @@ printf("filename == %s\n", filename);
 
         //发送文件
         sendFile(sockfd, fd);
-printf("puts no %d\n", i);
+
     }
     int send_stat = 1;
     send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
