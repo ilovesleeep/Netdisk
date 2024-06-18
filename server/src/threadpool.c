@@ -25,12 +25,19 @@ void* eventLoop(void* arg) {
 
         char buf[MAXLINE];
         bzero(buf, MAXLINE);
-        taskHandler(task);
+        int retval = taskHandler(task);
         taskFree(task);
 
         printf("[INFO] %lu Ura! Waiting orders.\n", tid);
 
-        epollMod(pool->epfd, connfd, EPOLLIN | EPOLLONESHOT);
+        if(retval != 1){
+            epollMod(pool->epfd, connfd, EPOLLIN);
+        }
+        else{
+            epollDel(pool->epfd, connfd);
+        }
+        // epollAdd(pool->epfd, connfd);
+
     }
 }
 
