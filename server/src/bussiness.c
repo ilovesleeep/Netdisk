@@ -482,8 +482,6 @@ void rmCmd(Task* task) {
     // TODO:
     // 删除每一个目录项
     // 校验参数，发送校验结果，若为错误则发送错误信息
-    int send_status = 0;
-    char msg[MAXLINE] = {0};
     if (task->args[2] != NULL) {
         int sendstat = 1;  // 错误
         send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
@@ -519,7 +517,8 @@ void rmCmd(Task* task) {
     }
 
     // 如果删除不存在的目录，则返回报错信息
-    send_status = 1;
+    int send_status = 1;
+    char msg[MAXLINE] = {0};
     if (errnum == ENOENT) {
         send(task->fd, &send_status, sizeof(int), MSG_NOSIGNAL);
         strcpy(msg, strerror(errno));
