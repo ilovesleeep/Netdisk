@@ -25,6 +25,8 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#include <mysql/mysql.h>
+
 
 #define SIZE(a) (sizeof(a) / sizeof(a[0]))
 
