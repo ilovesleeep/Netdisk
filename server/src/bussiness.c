@@ -699,13 +699,13 @@ void mkdirCmd(Task* task) {
     return;
 }
 
-void exitCmd(Task* task) {
+void exitCmd(void) {
     // TODO:
 
     return;
 }
 
-void unknownCmd(Task* task) {
+void unknownCmd(void) {
     // TODO:
 
     return;
@@ -736,7 +736,7 @@ int taskHandler(Task* task) {
             retval = putsCmd(task);
             break;
         case CMD_EXIT:
-            exitCmd(task);
+            exitCmd();
             break;
         default:
             unknownCmd();

@@ -389,9 +389,6 @@ void putsCmd(int sockfd, char** args) {
         for (char* p = args[i]; *p != '\0'; p++) {
             for (char* start = p; *p != '/'; p++) {
                 if (*(p + 1) == '\0') {
-        for(char* p = args[i]; *p != '\0'; p++){
-            for(char* start = p; *p != '/'; p++){
-                if(*(p + 1) == '\0'){
                     strcpy(filename, start);
                     break;
                 }
