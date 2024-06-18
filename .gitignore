@@ -54,3 +54,8 @@ main
 server/src/user/b.txt
 #测试时txt用于测试
 *.txt
+afsdf
+.vscode/launch.json
+.vscode/settings.json
+.vscode/tasks.json
+client/src/a.txt
