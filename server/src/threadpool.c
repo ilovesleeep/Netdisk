@@ -31,10 +31,11 @@ void* eventLoop(void* arg) {
         printf("[INFO] %lu Ura! Waiting orders.\n", tid);
 
         if(retval != 1){
-            epollMod(pool->epfd, connfd, EPOLLIN);
+            epollMod(pool->epfd, connfd, EPOLLIN | EPOLLONESHOT);
         }
         else{
             epollDel(pool->epfd, connfd);
+            close(connfd);
         }
         // epollAdd(pool->epfd, connfd);
 
