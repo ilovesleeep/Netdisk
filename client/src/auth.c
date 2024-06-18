@@ -62,7 +62,7 @@ static int userLogin1(int sockfd, char* name, char* setting) {
         int ret = recv(sockfd, &user_stat, sizeof(int), MSG_WAITALL);
 
         if (user_stat == 1) {
-            printf("Sorry but user not exist, please re-enter\n");
+            printf("Sorry, the user does not exist, please re-enter\n");
             continue;
         }
 
