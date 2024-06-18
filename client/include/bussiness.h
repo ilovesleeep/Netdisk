@@ -20,7 +20,7 @@ void lsCmd(int sockfd);
 void pwdCmd(char* buf);
 void getsCmd(int sockfd);
 void mkdirCmd(int sockfd, char* buf);
-void rmCmd(int sockfd,char * buf);
+void rmCmd(int sockfd, char* buf);
 void putsCmd(int sockfd, char** args);
 void exitCmd(char* buf);
 
