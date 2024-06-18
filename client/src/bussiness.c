@@ -137,8 +137,6 @@ void sendFile(int sockfd, int fd) {
 
 void recvFile(int sockfd) {
 
-unsigned char md6[16];
-
     // 接收文件名
     DataBlock block;
     bzero(&block, sizeof(block));
