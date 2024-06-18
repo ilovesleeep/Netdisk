@@ -32,15 +32,18 @@ void lsCmd(Task* task);
 int deleteDir(const char* path);
 void rmCmd(Task* task);
 void pwdCmd(Task* task);
-void getsCmd(Task* task);
-void putsCmd(Task* task);
+int getsCmd(Task* task);
+int putsCmd(Task* task);
 void mkdirCmd(Task* task);
 void loginCheck1(Task* task);
 void loginCheck2(Task* task);
 void registerCmd(Task* task);
 void unknownCmd(void);
 
-void taskHandler(Task* task);
+int taskHandler(Task* task);
 void taskFree(Task* task);
+
+
+
 
 #endif
