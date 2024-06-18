@@ -732,12 +732,12 @@ void loginCheck1(Task* task) {
 
     // 用户存在
     sendn(task->fd, &user_stat, sizeof(int));
-    // 为用户创建家目录
-    mkdir(task->args[1], 0777);
     WorkDir* wd = task->wd_table[task->fd];
     // 更新 path
     bzero(wd->path, MAXLINE);
     sprintf(wd->path, "user/%s", task->args[1]);
+    // 为用户创建家目录
+    mkdir(wd->path, 0777);
     // 更新 index
     wd->index[1] = strlen(wd->path) - 1;
     /*

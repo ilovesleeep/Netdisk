@@ -67,7 +67,7 @@ void welcome(int sockfd, char* username) {
                 // userRegister(sockfd, username, password);
                 printf(
                     "Registration requires v50 to us, please contact admin\n");
-                break;
+                exit(EXIT_SUCCESS);
             case 3:
                 printf("See you\n");
                 exit(EXIT_SUCCESS);
