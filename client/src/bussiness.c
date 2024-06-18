@@ -172,6 +172,36 @@ void lsCmd(int sockfd) {
     return;
 }
 
+void rmCmd(int sockfd, char* buf) {
+    int recv_stat = 0;
+    recvn(sockfd, &recv_stat, sizeof(int));
+
+    // 错误处理
+    if (recv_stat == 1) {
+        int info_len = 0;
+        recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
+        char error_info[MAXLINE] = {0};
+        recv(sockfd, error_info, info_len, MSG_WAITALL);
+        puts(error_info);
+        return;
+    }
+
+    // 参数正确
+    recv_stat = 0;
+    recv(sockfd, &recv_stat, sizeof(int), MSG_NOSIGNAL);
+    // 错误处理
+    if (recv_stat != 0) {
+        int info_len = 0;
+        char recv_info[MAXLINE] = {0};
+        recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
+        recv(sockfd, recv_info, info_len, MSG_WAITALL);
+        puts(recv_info);
+        return;
+    }
+
+    return;
+}
+
 void pwdCmd(char* buf) {
     getcwd(buf, MAXLINE);
     return;
@@ -263,14 +293,6 @@ void putsCmd(int sockfd, char** args) {
 }
 
 void mkdirCmd(int sockfd, char* buf) {
-    recv(sockfd, buf, MAXLINE, 0);
-    if (strcmp(buf, "0") != 0) {
-        puts(buf);
-    }
-    return;
-}
-
-void rmCmd(int sockfd, char* buf) {
     recv(sockfd, buf, MAXLINE, 0);
     if (strcmp(buf, "0") != 0) {
         puts(buf);

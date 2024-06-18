@@ -340,6 +340,8 @@ void rmCmd(Task* task) {
     // TODO:
     // 删除每一个目录项
     // 校验参数，发送校验结果，若为错误则发送错误信息
+    int send_status = 0;
+    char msg[MAXLINE] = {0};
     if (task->args[2] != NULL) {
         int sendstat = 1;  // 错误
         send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
@@ -347,7 +349,7 @@ void rmCmd(Task* task) {
         int info_len = strlen(error_info);
         send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
         send(task->fd, error_info, info_len, MSG_NOSIGNAL);
-        return;
+        return -1;
     } else {
         int sendstat = 0;  // 正确
         send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
@@ -363,23 +365,27 @@ void rmCmd(Task* task) {
     sprintf(dir, "%s/%s", curr_path, task->args[1]);
 
     // 使用deleteDir函数删除文件
-
+    int errnum;
     if (remove(dir) == 0) {
         printf("Successfully deleted %s\n", dir);
-    } else if (deleteDir(dir) == 0) {
+        int send_stat = 0;
+        send(task->fd,&send_stat,sizeof(int),MSG_NOSIGNAL);
+    } else if ((errnum = deleteDir(dir)) == 0) {
         printf("Successfully deleted %s\n", dir);
+        int send_stat = 0;
+        send(task->fd,&send_stat,sizeof(int),MSG_NOSIGNAL);
     }
-    /*else{
-        //检查是否是因为目录不存在导致的错误
-        if(errno == ENOENT){
-            fprintf(stderr,"Error: The directory '%s' doesn't exist.\n",dir);
-        }
+
+    // 如果删除不存在的目录，则返回报错信息
+    send_status = 1;
+    if (errnum == ENOENT) {
+        send(task->fd,&send_status,sizeof(int),MSG_NOSIGNAL);
+        strcpy(msg, strerror(errno));
+        int info_len = strlen(msg);
+        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+        send(task->fd, msg, info_len, MSG_NOSIGNAL);
+        return;
     }
-*/
-    // send(task->fd,"0",sizeof("0"),0);
-    //} else {
-    //   perror("Error deleting file");
-    //}
 
     return;
 }
