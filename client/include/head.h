@@ -24,6 +24,7 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#include <dirent.h>
 
 #define SIZE(a) (sizeof(a) / sizeof(a[0]))
 
