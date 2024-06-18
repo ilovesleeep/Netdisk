@@ -3,8 +3,11 @@
 
 #include "head.h"
 #include "parser.h"
+#include "shadow.h"
 
 typedef struct {
+    char name[32];
+    char encrypted[128];
     char* path;
     int* index;
 } WorkDir;
@@ -32,6 +35,9 @@ void pwdCmd(Task* task);
 void getsCmd(Task* task);
 void putsCmd(Task* task);
 void mkdirCmd(Task* task);
+void loginCheck1(Task* task);
+void loginCheck2(Task* task);
+void registerCmd(Task* task);
 void unknownCmd(void);
 
 void taskHandler(Task* task);

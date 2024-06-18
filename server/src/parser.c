@@ -66,8 +66,12 @@ Command getCommand(const char* cmd) {
         return CMD_GETS;
     } else if (strcmp(cmd, "puts") == 0) {
         return CMD_PUTS;
-    } else if (strcmp(cmd, "exit") == 0) {
-        return CMD_EXIT;
+    } else if (strcmp(cmd, "login1") == 0) {
+        return CMD_LOGIN1;
+    } else if (strcmp(cmd, "login2") == 0) {
+        return CMD_LOGIN2;
+    } else if (strcmp(cmd, "register") == 0) {
+        return CMD_REGISTER;
     } else {
         return CMD_UNKNOWN;
     }
