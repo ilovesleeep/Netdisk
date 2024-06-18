@@ -496,6 +496,15 @@ void putsCmd(Task* task) {
 }
 
 void mkdirCmd(Task* task) {
+    if (task->args[1] == NULL) { // missing operand
+        char errmsg[MAXLINE] = "mkdir: missing operand";
+        send(task->fd, errmsg, strlen(errmsg), 0);
+        // 后面补日志
+        error(0, errno, "%d mkdir:", task->fd);
+        return;
+    } 
+
+    
     // if (sizeof(task ->args[1]) >= 1000) {
     //     error(1, 0, "mkdir_dirlen too long!");
     // }
@@ -532,6 +541,7 @@ void mkdirCmd(Task* task) {
                 send(task->fd, errmsg, strlen(errmsg), 0);
                 // 后面补日志
                 error(0, errno, "%d mkdir:", task->fd);
+                return;
             }
 
             *p = '/';
@@ -545,6 +555,7 @@ void mkdirCmd(Task* task) {
         send(task->fd, errmsg, strlen(errmsg), 0);
         // 后面补日志
         error(0, errno, "%d mkdir:", task->fd);
+        return;
     }
 
     // 成功了给客户端发一个0
