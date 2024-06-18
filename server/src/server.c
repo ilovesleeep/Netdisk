@@ -19,7 +19,7 @@ int serverMain(void) {
             break;
         default:
             // 父进程
-            printf("[INFO] %d Parent porcess reporting\n", getpid());
+            printf("[INFO] %d MCV porcess reporting\n", getpid());
             close(g_exit_pipe[0]);
             // 捕获 SIGUSR1 信号
             if (signal(SIGUSR1, exitHandler) == SIG_ERR) {
@@ -30,7 +30,7 @@ int serverMain(void) {
             exit(0);
     }
     // 子进程
-    printf("[INFO] %d Child process reporting\n", getpid());
+    printf("[INFO] %d Kirov process reporting\n", getpid());
     close(g_exit_pipe[1]);
 
     // 读取配置文件
@@ -84,7 +84,6 @@ int serverMain(void) {
 
             } else {
                 // 客户端发过来请求
-
                 requestHandler(ready_events[i].data.fd, pool, workdir_table);
             }
         }
@@ -115,22 +114,61 @@ int serverExit(ThreadPool* pool) {
 
 void requestHandler(int connfd, ThreadPool* pool, WorkDir** workdir_table) {
     // 接收、处理请求
-    char req[MAXLINE] = {0};
-    int retval = recv(connfd, req, MAXLINE, 0);
-    if (retval < 0) {
-        error(0, errno, "recv");
-        close(connfd);
-    } else if (retval == 0) {
+    // 先接长度
+    int req_len = -1;
+    int ret = recv(connfd, &req_len, sizeof(int), MSG_WAITALL);
+
+    if (req_len > 0) {
+        // 再接内容
+        char req[MAXLINE] = {0};
+        ret = recv(connfd, req, req_len, MSG_WAITALL);
+
+        if (ret > 0) {
+            // 创建任务
+            Task* task = (Task*)malloc(sizeof(Task));
+            task->fd = connfd;
+            task->args = parseRequest(req);
+            task->wd_table = workdir_table;
+            // 判断任务类型，注册登录
+
+            // 把任务添加到任务队列
+            blockqPush(pool->task_queue, task);
+        }
+    }
+
+    if (ret == 0) {
         printf("[INFO] Say goodbye to connection %d\n", connfd);
         workdirFree(workdir_table[connfd]);
         close(connfd);
-    } else {
-        // 把任务添加到任务队列
-        Task* task = (Task*)malloc(sizeof(Task));
-        task->fd = connfd;
-        task->args = parseRequest(req);
-        task->wd_table = workdir_table;
-
-        blockqPush(pool->task_queue, task);
+    } else if (ret < 0) {
+        error(0, errno, "recv");
     }
+
+    /*
+        if (ret < 0) {
+            error(0, errno, "recv");
+            close(connfd);
+        } else if (ret == 0) {
+            printf("[INFO] Say goodbye to connection %d\n", connfd);
+            workdirFree(workdir_table[connfd]);
+            close(connfd);
+        } else {
+            // req_len > 0
+            // 再接内容
+            char req[MAXLINE] = {0};
+            ret = recv(connfd, req, req_len, MSG_WAITALL);
+            printf("[req]: %s\n", req);
+
+            // 创建任务
+            Task* task = (Task*)malloc(sizeof(Task));
+            task->fd = connfd;
+            task->args = parseRequest(req);
+            task->wd_table = workdir_table;
+
+            // 判断任务类型，注册登录
+
+            // 把任务添加到任务队列
+            blockqPush(pool->task_queue, task);
+        }
+        */
 }

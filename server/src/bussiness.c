@@ -547,6 +547,97 @@ void mkdirCmd(Task* task) {
     return;
 }
 
+static void getSetting(char* setting, char* passwd) {
+    int i, j;
+    // 取出salt,i 记录密码字符下标，j记录$出现次数
+    for (i = 0, j = 0; passwd[i] && j != 4; ++i) {
+        if (passwd[i] == '$') ++j;
+    }
+    strncpy(setting, passwd, i);
+}
+
+void loginCheck1(Task* task) {
+    printf("[INFO] loginCheck1 start\n");
+    printf("[INFO] user to login: <%s>\n", task->args[1]);
+
+    struct spwd* sp = getspnam(task->args[1]);
+
+    // 0: 存在, 1: 不存在
+    // 暂时先用数字，后面用 enum
+    int user_stat = 0;
+    if (sp == NULL) {
+        // 用户不存在
+        user_stat = 1;
+        sendn(task->fd, &user_stat, sizeof(int));
+        return;
+    }
+
+    // 用户存在
+    sendn(task->fd, &user_stat, sizeof(int));
+    // 为用户创建家目录
+    mkdir(task->args[1], 0777);
+    WorkDir* wd = task->wd_table[task->fd];
+    // 更新 path
+    bzero(wd->path, MAXLINE);
+    sprintf(wd->path, "user/%s", task->args[1]);
+    printf("curr path: <%s>\n", wd->path);
+    // 更新 index
+    wd->index[1] = strlen(wd->path) - 1;
+    printf("curr index: <%d>\n", wd->index[1]);
+    /*
+    // 执行 mkdir
+    char tmp_req[MAXLINE] = {0};
+    sprintf(tmp_req, "mkdir user/%s", task->args[1]);
+    Task* tmp_task = (Task*)malloc(sizeof(Task));
+    tmp_task->fd = task->fd;
+    tmp_task->args = parseRequest(tmp_req);
+    tmp_task->wd_table = task->wd_table;
+    mkdirCmd(tmp_task);
+    taskFree(tmp_task);
+    */
+
+    // 保存用户名
+    strcpy(wd->name, task->args[1]);
+
+    char setting[128] = {0};
+    // 保存加密密文
+    strcpy(wd->encrypted, sp->sp_pwdp);
+    // 提取 setting
+    getSetting(setting, sp->sp_pwdp);
+
+    int setting_len = strlen(setting);
+    sendn(task->fd, &setting_len, sizeof(int));
+    sendn(task->fd, setting, setting_len);
+
+    printf("[INFO] loginCheck1 end\n");
+    return;
+}
+
+void loginCheck2(Task* task) {
+    printf("[INFO] loginCheck2 start\n");
+
+    // printf("[INFO] user passwd: <%s>\n", task->args[1]);
+
+    int user_stat = 0;
+
+    if (strcmp(task->wd_table[task->fd]->encrypted, task->args[1]) == 0) {
+        // 登录成功
+        sendn(task->fd, &user_stat, sizeof(int));
+        printf("[INFO] <%s> login successfully\n",
+               task->wd_table[task->fd]->name);
+    } else {
+        // 登录失败，密码错误
+        user_stat = 1;
+        sendn(task->fd, &user_stat, sizeof(int));
+        printf("[INFO] <%s> login failed\n", task->wd_table[task->fd]->name);
+    }
+
+    printf("[INFO] loginCheck2 end\n");
+    return;
+}
+
+void registerCmd(Task* task) { return; }
+
 void unknownCmd(void) {
     printf("[WARN] unknownCmd\n");
     return;
@@ -575,6 +666,15 @@ void taskHandler(Task* task) {
         case CMD_PUTS:
             putsCmd(task);
             break;
+        case CMD_LOGIN1:
+            loginCheck1(task);
+            break;
+        case CMD_LOGIN2:
+            loginCheck2(task);
+            break;
+        case CMD_REGISTER:
+            registerCmd(task);
+            break;
         default:
             unknownCmd();
             break;
@@ -599,6 +699,9 @@ void workdirInit(WorkDir** workdir_table, int connfd, char* username) {
     strcpy(workdir_table[connfd]->path, username);
     workdir_table[connfd]->index[0] = 1;
     workdir_table[connfd]->index[1] = strlen(username) - 1;
+
+    strcpy(workdir_table[connfd]->name, "");
+    strcpy(workdir_table[connfd]->encrypted, "");
 }
 
 void workdirFree(WorkDir* workdir) {

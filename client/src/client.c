@@ -1,7 +1,7 @@
 #include "../include/client.h"
 
 #define MAXLINE 1024
-#define MAX_USERINFO_LENGTH 256
+#define MAX_NAME_LENGTH 32
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
@@ -12,17 +12,19 @@ int main(int argc, char* argv[]) {
 
     printMenu();
 
-    char username[MAX_USERINFO_LENGTH] = {0};
-    welcome(username);
+    char username[MAX_NAME_LENGTH] = {0};
+
+    welcome(sockfd, username);
 
     return sessionHandler(sockfd, argv[1], username);
 }
 
 void printMenu(void) {
+    system("clear");
     printf(
         "_________________________________\n"
         "|                               |\n"
-        "|   Welcome to Baidu Netdisk!   |\n"
+        "|   Welcome to NewBee Netdisk!  |\n"
         "|                               |\n"
         "|      Menu:                    |\n"
         "|           1. Login            |\n"
@@ -32,9 +34,7 @@ void printMenu(void) {
         "|_______________________________|\n\n");
 }
 
-void welcome(char* username) {
-    char password[MAX_USERINFO_LENGTH] = {0};
-
+void welcome(int sockfd, char* username) {
     int option = -1;
     while (option < 0) {
         printf("Enter option number: ");
@@ -61,10 +61,12 @@ void welcome(char* username) {
 
         switch (option) {
             case 1:
-                userLogin(username, password);
+                userLogin(sockfd, username);
                 break;
             case 2:
-                userRegister(username, password);
+                // userRegister(sockfd, username, password);
+                printf(
+                    "Registration requires v50 to us, please contact admin\n");
                 break;
             case 3:
                 printf("See you\n");
@@ -96,7 +98,10 @@ int sessionHandler(int sockfd, char* host, char* username) {
         }
 
         // 发送命令到服务器
-        send(sockfd, buf, strlen(buf) - 1, 0);
+        int buf_len = strlen(buf);
+        buf[--buf_len] = '\0';  // -1 for '\n'
+        sendn(sockfd, &buf_len, sizeof(int));
+        sendn(sockfd, buf, buf_len);
         bzero(buf, MAXLINE);
 
         // 接收服务器执行的结果
@@ -108,7 +113,7 @@ int sessionHandler(int sockfd, char* host, char* username) {
                 lsCmd(sockfd);
                 break;
             case CMD_RM:
-                rmCmd(sockfd,buf);
+                rmCmd(sockfd, buf);
                 break;
             case CMD_PWD:
                 recv(sockfd, buf, MAXLINE, 0);

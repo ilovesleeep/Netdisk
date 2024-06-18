@@ -13,7 +13,7 @@ int clientMain(int argc, char* argv[]);
 
 void printMenu(void);
 
-void welcome(char* username);
+void welcome(int sockfd, char* username);
 
 int sessionHandler(int sockfd, char* host, char* user);
 

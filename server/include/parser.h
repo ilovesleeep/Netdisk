@@ -16,7 +16,9 @@ typedef enum {
     CMD_GETS,
     CMD_PUTS,
     CMD_MKDIR,
-    CMD_EXIT,
+    CMD_LOGIN1,
+    CMD_LOGIN2,
+    CMD_REGISTER,
     CMD_UNKNOWN,
 } Command;
 
