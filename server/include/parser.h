@@ -13,15 +13,16 @@ typedef enum {
     CMD_GETS,
     CMD_PUTS,
     CMD_MKDIR,
+    CMD_REG1,
+    CMD_REG2,
     CMD_LOGIN1,
     CMD_LOGIN2,
-    CMD_REGISTER,
     CMD_UNKNOWN,
 } Command;
 
 void readConfig(const char* filename, HashTable* ht);
 
-char** parseRequest(const char* req);
+char** getArgs(const char* req);
 Command getCommand(const char* cmd);
 
 #endif

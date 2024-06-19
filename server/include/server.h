@@ -1,6 +1,7 @@
 #ifndef __NB_SERVER_H
 #define __NB_SERVER_H
 
+#include "dbpool.h"
 #include "log.h"
 #include "network.h"
 #include "parser.h"
@@ -11,10 +12,11 @@ typedef struct {
     int num_threads;
 } ServerConfig;
 
-int serverMain(int argc, char* argv[]);
+void serverInit(ServerConfig* conf, HashTable* ht);
+int serverMain(ServerConfig* conf, HashTable* ht);
 int serverExit(ThreadPool* pool);
-void setServerConfig(HashTable* ht, ServerConfig* conf);
 
-void requestHandler(int connfd, ThreadPool* pool, WorkDir** workdir_table);
+void requestHandler(int connfd, ThreadPool* pool, int* user_table,
+                    DBConnectionPool* dbpool, WorkDir** workdir_table);
 
 #endif

@@ -28,7 +28,7 @@ void readConfig(const char* filename, HashTable* ht) {
     fclose(fp);
 }
 
-char** parseRequest(const char* req) {
+char** getArgs(const char* req) {
     char** args = (char**)calloc(MAXARGS, sizeof(char*));
     if (args == NULL) {
         log_error("malloc: %s", strerror(errno));
@@ -75,12 +75,14 @@ Command getCommand(const char* cmd) {
         return CMD_GETS;
     } else if (strcmp(cmd, "puts") == 0) {
         return CMD_PUTS;
+    } else if (strcmp(cmd, "register1") == 0) {
+        return CMD_REG1;
+    } else if (strcmp(cmd, "register1") == 0) {
+        return CMD_REG1;
     } else if (strcmp(cmd, "login1") == 0) {
         return CMD_LOGIN1;
     } else if (strcmp(cmd, "login2") == 0) {
         return CMD_LOGIN2;
-    } else if (strcmp(cmd, "register") == 0) {
-        return CMD_REGISTER;
     } else {
         return CMD_UNKNOWN;
     }
