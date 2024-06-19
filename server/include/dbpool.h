@@ -1,13 +1,13 @@
 #ifndef __NB_DB_POOL_H
 #define __NB_DB_POOL_H
 
-// #include <mysql/field_types.h>
+#include <mysql/field_types.h>
 #include <mysql/mysql.h>
 
 #include "../include/hashtable.h"
+#include "hashtable.h"
 #include "head.h"
-
-typedef struct ConnNode ConnNode;
+#include "log.h"
 
 typedef struct ConnNode {
     MYSQL* pconn;
@@ -35,10 +35,13 @@ typedef struct {
 
 DBConnectionPool* initDBPool(HashTable* ht);
 
+// 这两个函数线程使用时要成对出现，尤其注意错误退出时
 MYSQL* getDBConnection(DBConnectionPool* dbpool);
 void releaseDBConnection(DBConnectionPool* dbpool, MYSQL* pconn);
+
 void expandDBPool(DBConnectionPool* dbpool, int add_size);
 void shrinkDBPool(DBConnectionPool* dbpool);
+// 监视线程
 void* monitorDBPool(void* arg);
 
 void destroyDBPool(DBConnectionPool* dbpool);
