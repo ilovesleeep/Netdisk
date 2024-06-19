@@ -2,9 +2,13 @@
 #define __NB_BUSSINESS_H
 
 #include "head.h"
+#include "log.h"
 #include "parser.h"
+#include "shadow.h"
 
 typedef struct {
+    char name[32];
+    char encrypted[128];
     char* path;
     int* index;
 } WorkDir;
@@ -32,12 +36,12 @@ void pwdCmd(Task* task);
 int getsCmd(Task* task);
 int putsCmd(Task* task);
 void mkdirCmd(Task* task);
+void loginCheck1(Task* task);
+void loginCheck2(Task* task);
+void registerCmd(Task* task);
 void unknownCmd(void);
 
 int taskHandler(Task* task);
 void taskFree(Task* task);
-
-
-
 
 #endif

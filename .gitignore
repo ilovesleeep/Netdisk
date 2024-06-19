@@ -50,12 +50,10 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
-main
-server/src/user/b.txt
-#测试时txt用于测试
+
+# Diy
 *.txt
+*.log
+.vscode/
+main
 afsdf
-.vscode/launch.json
-.vscode/settings.json
-.vscode/tasks.json
-client/src/a.txt

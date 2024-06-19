@@ -1,12 +1,8 @@
-
 #include "../include/network.h"
 
 #define BACKLOG 10
 
-int tcpListen(int port) {
-    char port_str[6];
-    sprintf(port_str, "%d", port);
-
+int tcpListen(char* port) {
     struct addrinfo hints, *res;
     bzero(&hints, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
@@ -14,7 +10,7 @@ int tcpListen(int port) {
     hints.ai_flags = AI_PASSIVE;
 
     int err;
-    if ((err = getaddrinfo(NULL, port_str, &hints, &res)) == -1) {
+    if ((err = getaddrinfo(NULL, port, &hints, &res)) == -1) {
         error(1, 0, "getaddrinfo: %s", gai_strerror(err));
     }
 
@@ -59,6 +55,7 @@ int tcpListen(int port) {
         error(1, errno, "listen");
     }
 
+    log_info("Listening on port %s", port);
     return sockfd;
 }
 
@@ -117,9 +114,9 @@ void epollAdd(int epfd, int fd) {
 
 void epollDel(int epfd, int fd) { epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL); }
 
-void epollMod(int epfd, int fd, enum EPOLL_EVENTS mode) {
+void epollMod(int epfd, int fd, enum EPOLL_EVENTS epoll_events) {
     struct epoll_event event;
-    event.events = mode;
+    event.events = epoll_events;
     event.data.fd = fd;
     if (epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &event) == -1) {
         error(1, errno, "epoll_ctl");
