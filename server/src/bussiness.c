@@ -125,6 +125,7 @@ int sendFile(int sockfd, int fd) {
             void* addr =
                 mmap(NULL, length, PROT_READ, MAP_SHARED, fd, send_bytes);
             if (sendn(sockfd, addr, length) == -1) {
+                munmap(addr, length);
                 close(fd);
                 return 1;
             }
