@@ -1,12 +1,9 @@
 #ifndef __NB_PARSER_H
 #define __NB_PARSER_H
 
+#include "hashtable.h"
 #include "head.h"
-
-typedef struct {
-    int port;
-    int num_threads;
-} ServerConfig;
+#include "log.h"
 
 typedef enum {
     CMD_CD,
@@ -22,7 +19,7 @@ typedef enum {
     CMD_UNKNOWN,
 } Command;
 
-void parseConfig(ServerConfig* conf);
+void readConfig(const char* filename, HashTable* ht);
 
 char** parseRequest(const char* req);
 Command getCommand(const char* cmd);

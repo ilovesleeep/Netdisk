@@ -1,0 +1,35 @@
+2024-06-18 23:44:42 [INFO]  network.c:58: Listening on port 30001
+2024-06-18 23:44:49 [INFO]  bussiness.c:720: user to login: [kong]
+2024-06-18 23:44:51 [WARN]  bussiness.c:789: [kong] login failed
+2024-06-18 23:44:53 [WARN]  bussiness.c:789: [kong] login failed
+2024-06-18 23:44:54 [WARN]  bussiness.c:789: [kong] login failed
+2024-06-18 23:44:55 [INFO]  bussiness.c:784: [kong] login successfully
+2024-06-18 23:44:57 [WARN]  bussiness.c:370: [kong] want to escape
+2024-06-18 23:44:59 [WARN]  bussiness.c:370: [kong] want to escape
+2024-06-18 23:45:11 [INFO]  bussiness.c:720: user to login: [qwe]
+2024-06-18 23:45:13 [INFO]  bussiness.c:720: user to login: [sda]
+2024-06-18 23:45:14 [INFO]  bussiness.c:720: user to login: [x]
+2024-06-18 23:45:15 [INFO]  bussiness.c:720: user to login: [c]
+2024-06-18 23:45:15 [INFO]  bussiness.c:720: user to login: [v]
+2024-06-18 23:45:16 [INFO]  bussiness.c:720: user to login: [z]
+2024-06-18 23:45:16 [INFO]  bussiness.c:720: user to login: [x]
+2024-06-18 23:45:22 [INFO]  bussiness.c:720: user to login: [kong]
+2024-06-18 23:45:25 [WARN]  bussiness.c:789: [kong] login failed
+2024-06-18 23:45:26 [INFO]  bussiness.c:784: [kong] login successfully
+2024-06-18 23:45:30 [WARN]  bussiness.c:370: [kong] want to escape
+2024-06-18 23:45:34 [WARN]  bussiness.c:370: [kong] want to escape
+2024-06-18 23:45:35 [WARN]  bussiness.c:370: [kong] want to escape
+2024-06-18 23:45:35 [WARN]  bussiness.c:370: [kong] want to escape
+2024-06-18 23:48:02 [INFO]  network.c:58: Listening on port 30001
+2024-06-18 23:48:43 [INFO]  bussiness.c:720: user to login: [k]
+2024-06-18 23:48:50 [INFO]  bussiness.c:720: user to login: [kong]
+2024-06-18 23:48:51 [WARN]  bussiness.c:789: [kong] login failed
+2024-06-18 23:48:52 [WARN]  bussiness.c:789: [kong] login failed
+2024-06-18 23:48:53 [INFO]  bussiness.c:784: [kong] login successfully
+2024-06-18 23:49:30 [WARN]  bussiness.c:370: [kong] want to escape
+2024-06-18 23:49:33 [WARN]  bussiness.c:370: [kong] want to escape
+2024-06-18 23:49:41 [WARN]  bussiness.c:370: [kong] want to escape
+2024-06-18 23:49:45 [WARN]  bussiness.c:370: [kong] want to escape
+2024-06-18 23:49:52 [WARN]  bussiness.c:370: [kong] want to escape
+2024-06-18 23:50:22 [WARN]  bussiness.c:370: [kong] want to escape
+2024-06-18 23:50:28 [WARN]  bussiness.c:370: [kong] want to escape

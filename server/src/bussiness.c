@@ -351,6 +351,11 @@ int cdCmd(Task* task) {
     }
     closedir(pdir);
 
+    // 备份，越权时回退
+    char* path_bak = strdup(wd->path);
+    int index_bak[MAXLINE] = {0};
+    memcpy(&index_bak, wd->index, MAXLINE * sizeof(int));
+
     // 更新 WorkDir
     char* tmp = strdup(task->args[1]);
     char* token = strtok(tmp, "/");
@@ -366,6 +371,14 @@ int cdCmd(Task* task) {
                 strcpy(msg, "Permission denied");
                 sendn(task->fd, msg, strlen(msg));
                 free(tmp);
+
+                log_warn("[%s] want to escape", wd->name);
+
+                // 回退
+                strcpy(wd->path, path_bak);
+                free(path_bak);
+                memcpy(wd->index, &index_bak, MAXLINE * sizeof(int));
+
                 return -1;
             }
 
@@ -715,7 +728,7 @@ static void getSetting(char* setting, char* passwd) {
 
 void loginCheck1(Task* task) {
     printf("[INFO] loginCheck1 start\n");
-    printf("[INFO] user to login: <%s>\n", task->args[1]);
+    log_info("user to login: [%s]", task->args[1]);
 
     struct spwd* sp = getspnam(task->args[1]);
 
@@ -774,17 +787,17 @@ void loginCheck2(Task* task) {
     // printf("[INFO] user passwd: <%s>\n", task->args[1]);
 
     int user_stat = 0;
+    WorkDir* wd = task->wd_table[task->fd];
 
-    if (strcmp(task->wd_table[task->fd]->encrypted, task->args[1]) == 0) {
+    if (strcmp(wd->encrypted, task->args[1]) == 0) {
         // 登录成功
         sendn(task->fd, &user_stat, sizeof(int));
-        printf("[INFO] <%s> login successfully\n",
-               task->wd_table[task->fd]->name);
+        log_info("[%s] login successfully", wd->name);
     } else {
         // 登录失败，密码错误
         user_stat = 1;
         sendn(task->fd, &user_stat, sizeof(int));
-        printf("[INFO] <%s> login failed\n", task->wd_table[task->fd]->name);
+        log_warn("[%s] login failed", wd->name);
     }
 
     printf("[INFO] loginCheck2 end\n");

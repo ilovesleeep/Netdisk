@@ -1,7 +1,7 @@
 #include "../include/server.h"
 
-int main(void) {
-    serverMain();
+int main(int argc, char* argv[]) {
+    serverMain(argc, argv);
 
     return 0;
 }

@@ -3,44 +3,53 @@
 #define MAXLINE 1024
 #define MAXARGS 32
 
-void parseConfig(ServerConfig* conf) {
-    int fd = open("../config/server.conf", O_RDONLY);
-    if (fd == -1) {
-        error(1, errno, "open server.conf");
+void readConfig(const char* filename, HashTable* ht) {
+    FILE* fp = fopen(filename, "r");
+    if (fp == NULL) {
+        error(1, errno, "fopen %s", filename);
     }
 
-    char buf[MAXLINE];
-    read(fd, buf, MAXLINE);
+    char buf[256] = {0};
+    while (fgets(buf, sizeof(buf), fp) != NULL) {
+        char key[128] = {0};
 
-    char* token = strtok(buf, "= \r\n\t");
-    while (token != NULL) {
-        if (strcmp(token, "port") == 0) {
-            token = strtok(NULL, "= \r\n\t");
+        char* token = strtok(buf, "=\n");
+        strcpy(key, token);
+        token = strtok(NULL, "=\n");
 
-            printf("[INFO] Set port = %s\n", token);
-            conf->port = atoi(token);
-        } else if (strcmp(token, "num_threads") == 0) {
-            token = strtok(NULL, "= \r\n\t");
+        char* value = (char*)calloc(1, strlen(token) + 1);  // +1 for '\0'
+        strcpy(value, token);
+        insert(ht, key, value);
 
-            printf("[INFO] Set num_threads = %s\n", token);
-            conf->num_threads = atoi(token);
-        }
-
-        token = strtok(NULL, "= \r\n\t");
+        // for safe
+        token = NULL;
     }
 
-    close(fd);
+    fclose(fp);
 }
 
 char** parseRequest(const char* req) {
-    // TODO: error checking
     char** args = (char**)calloc(MAXARGS, sizeof(char*));
+    if (args == NULL) {
+        log_error("malloc: %s", strerror(errno));
+        error(1, errno, "malloc");
+    }
 
     char* tmp = strdup(req);
     char* token = strtok(tmp, " \r\n\t");
     for (int i = 0; i < MAXARGS && token != NULL; ++i) {
         int token_len = strlen(token);
         args[i] = (char*)calloc((token_len + 1), sizeof(char));  // +1 for '\0'
+        if (args[i] == NULL) {
+            while (i >= 0) {
+                free(args[--i]);
+            }
+            free(args);
+            free(tmp);
+            log_error("malloc: %s", strerror(errno));
+            error(1, errno, "malloc");
+        }
+
         strcpy(args[i], token);
         token = strtok(NULL, " \r\n\t");
     }
