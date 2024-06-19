@@ -50,3 +50,10 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Diy
+*.txt
+*.log
+.vscode/
+main
+afsdf
