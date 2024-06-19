@@ -2,14 +2,26 @@
 
 #define MAXEVENTS 1024
 #define MAXLINE 1024
+#define MAXUSER 1024
+
+void serverInit(ServerConfig* conf, HashTable* ht) {
+    char* port = (char*)find(ht, "port");
+    if (port != NULL) {
+        strcpy(conf->port, port);
+    }
+    const char* num_str = (const char*)find(ht, "num_threads");
+    if (num_str != NULL) {
+        conf->num_threads = atoi(num_str);
+    }
+}
 
 int g_exit_pipe[2];
-void exitHandler(int signo) {
+static void exitHandler(int signo) {
     printf("[INFO] Exit order received.\n");
     write(g_exit_pipe[1], "1", 1);
 }
 
-int serverMain(int argc, char* argv[]) {
+int serverMain(ServerConfig* conf, HashTable* ht) {
     pipe(g_exit_pipe);
     pid_t pid = fork();
     switch (pid) {
@@ -33,18 +45,6 @@ int serverMain(int argc, char* argv[]) {
     printf("[INFO] %d Kirov process reporting\n", getpid());
     close(g_exit_pipe[1]);
 
-    // 初始化哈希表，用于存储配置
-    HashTable ht;
-    initHashTable(&ht);
-
-    // 读取和设置配置
-    readConfig(argv[1], &ht);
-    ServerConfig conf = {"8080", 2};
-    setServerConfig(&ht, &conf);
-
-    // 初始化日志
-    initLog(&ht);
-
     // epoll
     int epfd = epoll_create(1);
 
@@ -52,10 +52,17 @@ int serverMain(int argc, char* argv[]) {
     epollAdd(epfd, g_exit_pipe[0]);
 
     // 创建线程池
-    ThreadPool* pool = createThreadPool(conf.num_threads, epfd);
+    ThreadPool* pool = createThreadPool(conf->num_threads, epfd);
+
+    // 初始化数据库连接池
+    DBConnectionPool* dbpool = initDBPool(ht);
+
+    // 创建连接池监视线程
+    pthread_t monitor_dbpool;
+    pthread_create(&monitor_dbpool, NULL, monitorDBPool, dbpool);
 
     // 监听端口
-    int listenfd = tcpListen(conf.port);
+    int listenfd = tcpListen(conf->port);
     epollAdd(epfd, listenfd);
 
     struct epoll_event* ready_events =
@@ -63,6 +70,9 @@ int serverMain(int argc, char* argv[]) {
 
     // 存储用户当前目录
     WorkDir* workdir_table[MAXEVENTS] = {0};
+
+    // 存储用户当前目录
+    int user_table[MAXUSER] = {0};
 
     // 主循环
     while (1) {
@@ -87,11 +97,15 @@ int serverMain(int argc, char* argv[]) {
 
             } else if (ready_events[i].data.fd == g_exit_pipe[0]) {
                 // 父进程传来退出信号
+                pthread_cancel(monitor_dbpool);
+                pthread_join(monitor_dbpool, NULL);
+                destroyDBPool(dbpool);
                 serverExit(pool);
 
             } else {
                 // 客户端发过来请求
-                requestHandler(ready_events[i].data.fd, pool, workdir_table);
+                requestHandler(ready_events[i].data.fd, pool, user_table,
+                               dbpool, workdir_table);
             }
         }
     }
@@ -105,8 +119,7 @@ int serverExit(ThreadPool* pool) {
 
     // 通知各个子线程退出
     for (int j = 0; j < pool->num_threads; j++) {
-        // 优雅退出
-        Task exit_task = {-1, NULL};
+        Task exit_task = {-1, -1, 0, NULL, NULL, NULL};
         blockqPush(pool->task_queue, &exit_task);
     }
     // 等待各个子线程退出
@@ -119,18 +132,8 @@ int serverExit(ThreadPool* pool) {
     pthread_exit(0);
 }
 
-void setServerConfig(HashTable* ht, ServerConfig* conf) {
-    char* port = (char*)find(ht, "port");
-    if (port != NULL) {
-        strcpy(conf->port, port);
-    }
-    const char* num_str = (const char*)find(ht, "num_threads");
-    if (num_str != NULL) {
-        conf->num_threads = atoi(num_str);
-    }
-}
-
-void requestHandler(int connfd, ThreadPool* pool, WorkDir** workdir_table) {
+void requestHandler(int connfd, ThreadPool* pool, int* user_table,
+                    DBConnectionPool* dbpool, WorkDir** workdir_table) {
     // 接收、处理请求
     // 先接长度
     int req_len = -1;
@@ -145,9 +148,11 @@ void requestHandler(int connfd, ThreadPool* pool, WorkDir** workdir_table) {
             // 创建任务
             Task* task = (Task*)malloc(sizeof(Task));
             task->fd = connfd;
-            task->args = parseRequest(req);
+            task->uid = user_table[connfd];
+            task->args = getArgs(req);
+            task->cmd = getCommand(task->args[0]);
+            task->dbpool = dbpool;
             task->wd_table = workdir_table;
-            // 判断任务类型，注册登录
 
             // 把任务添加到任务队列
             blockqPush(pool->task_queue, task);
@@ -161,32 +166,4 @@ void requestHandler(int connfd, ThreadPool* pool, WorkDir** workdir_table) {
     } else if (ret < 0) {
         error(0, errno, "recv");
     }
-
-    /*
-        if (ret < 0) {
-            error(0, errno, "recv");
-            close(connfd);
-        } else if (ret == 0) {
-            printf("[INFO] Say goodbye to connection %d\n", connfd);
-            workdirFree(workdir_table[connfd]);
-            close(connfd);
-        } else {
-            // req_len > 0
-            // 再接内容
-            char req[MAXLINE] = {0};
-            ret = recv(connfd, req, req_len, MSG_WAITALL);
-            printf("[req]: %s\n", req);
-
-            // 创建任务
-            Task* task = (Task*)malloc(sizeof(Task));
-            task->fd = connfd;
-            task->args = parseRequest(req);
-            task->wd_table = workdir_table;
-
-            // 判断任务类型，注册登录
-
-            // 把任务添加到任务队列
-            blockqPush(pool->task_queue, task);
-        }
-        */
 }

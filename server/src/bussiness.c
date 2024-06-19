@@ -753,17 +753,6 @@ void loginCheck1(Task* task) {
     mkdir(wd->path, 0777);
     // 更新 index
     wd->index[1] = strlen(wd->path) - 1;
-    /*
-    // 执行 mkdir
-    char tmp_req[MAXLINE] = {0};
-    sprintf(tmp_req, "mkdir user/%s", task->args[1]);
-    Task* tmp_task = (Task*)malloc(sizeof(Task));
-    tmp_task->fd = task->fd;
-    tmp_task->args = parseRequest(tmp_req);
-    tmp_task->wd_table = task->wd_table;
-    mkdirCmd(tmp_task);
-    taskFree(tmp_task);
-    */
 
     // 保存用户名
     strcpy(wd->name, task->args[1]);
@@ -805,7 +794,96 @@ void loginCheck2(Task* task) {
     return;
 }
 
-void registerCmd(Task* task) { return; }
+static void generateSalt();
+
+void regCheck1(Task* task) {
+    printf("[INFO] regCheck1 start\n");
+    log_info("user to register: [%s]", task->args[1]);
+
+    //___________________________________________
+    // 查数据库，用户名是否存在
+    MYSQL* pconn = getDBConnection(task->dbpool);
+
+    char sql[] = "SELECT * FROM t_user_0614 WHERE id > 0";
+    int err = mysql_query(pconn, sql);
+    if (err) {
+        error(1, 0, "[ERROR] (%d, %s)\n", mysql_errno(pconn),
+              mysql_error(pconn));
+    }
+
+    MYSQL_RES* res = mysql_store_result(pconn);
+    printf("rows: %llu\n", mysql_num_rows(res));
+
+    MYSQL_ROW row;
+    while ((row = mysql_fetch_row(res)) != NULL) {
+        int num_fields = mysql_num_fields(res);
+        for (int i = 0; i < num_fields; ++i) {
+            printf("%s\t", row[i]);
+        }
+        putchar('\n');
+    }
+    /*
+    //___________________________________________
+    // 0: 用户名可用, 1: 用户名不可用
+    int status_code = 0;
+    if (sp == NULL) {
+        // 用户不存在
+        status_code = 1;
+        sendn(task->fd, &status_code, sizeof(int));
+        return;
+    }
+
+    // 用户存在
+    sendn(task->fd, &status_code, sizeof(int));
+    WorkDir* wd = task->wd_table[task->fd];
+    // 更新 path
+    bzero(wd->path, MAXLINE);
+    sprintf(wd->path, "user/%s", task->args[1]);
+    // 为用户创建家目录
+    mkdir(wd->path, 0777);
+    // 更新 index
+    wd->index[1] = strlen(wd->path) - 1;
+
+    // 保存用户名
+    strcpy(wd->name, task->args[1]);
+
+    char setting[128] = {0};
+    // 保存加密密文
+    strcpy(wd->encrypted, sp->sp_pwdp);
+    // 提取 setting
+    getSetting(setting, sp->sp_pwdp);
+
+    int setting_len = strlen(setting);
+    sendn(task->fd, &setting_len, sizeof(int));
+    sendn(task->fd, setting, setting_len);
+
+    printf("[INFO] loginCheck1 end\n");
+    */
+    return;
+}
+
+void regCheck2(Task* task) {
+    printf("[INFO] loginCheck2 start\n");
+
+    // printf("[INFO] user passwd: <%s>\n", task->args[1]);
+
+    int user_stat = 0;
+    WorkDir* wd = task->wd_table[task->fd];
+
+    if (strcmp(wd->encrypted, task->args[1]) == 0) {
+        // 登录成功
+        sendn(task->fd, &user_stat, sizeof(int));
+        log_info("[%s] login successfully", wd->name);
+    } else {
+        // 登录失败，密码错误
+        user_stat = 1;
+        sendn(task->fd, &user_stat, sizeof(int));
+        log_warn("[%s] login failed", wd->name);
+    }
+
+    printf("[INFO] loginCheck2 end\n");
+    return;
+}
 
 void unknownCmd(void) {
     // TODO:
@@ -843,8 +921,11 @@ int taskHandler(Task* task) {
         case CMD_LOGIN2:
             loginCheck2(task);
             break;
-        case CMD_REGISTER:
-            registerCmd(task);
+        case CMD_REG1:
+            regCheck1(task);
+            break;
+        case CMD_REG2:
+            regCheck2(task);
             break;
         default:
             unknownCmd();

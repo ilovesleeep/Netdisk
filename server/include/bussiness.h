@@ -1,10 +1,12 @@
 #ifndef __NB_BUSSINESS_H
 #define __NB_BUSSINESS_H
 
+#include <shadow.h>
+
+#include "dbpool.h"
 #include "head.h"
 #include "log.h"
 #include "parser.h"
-#include "shadow.h"
 
 typedef struct {
     char name[32];
@@ -15,7 +17,10 @@ typedef struct {
 
 typedef struct {
     int fd;
+    int uid;
+    Command cmd;
     char** args;
+    DBConnectionPool* dbpool;
     WorkDir** wd_table;  // connfd 作为索引
 } Task;
 
@@ -36,9 +41,10 @@ void pwdCmd(Task* task);
 int getsCmd(Task* task);
 int putsCmd(Task* task);
 void mkdirCmd(Task* task);
+void regCheck1(Task* task);
+void regCheck2(Task* task);
 void loginCheck1(Task* task);
 void loginCheck2(Task* task);
-void registerCmd(Task* task);
 void unknownCmd(void);
 
 int taskHandler(Task* task);
