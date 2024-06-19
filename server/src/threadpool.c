@@ -49,6 +49,9 @@ ThreadPool* createThreadPool(int n, int epfd) {
     pool->task_queue = blockqCreate();
     pool->epfd = epfd;
 
+    // 创建监视DB连接池的线程
+    // TODO:该线程使用函数为 monitorPool
+
     // 创建线程
     for (int i = 0; i < n; i++) {
         pthread_create(&pool->threads[i], NULL, eventLoop, pool);
