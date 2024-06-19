@@ -9,7 +9,7 @@ void exitHandler(int signo) {
     write(g_exit_pipe[1], "1", 1);
 }
 
-int serverMain(void) {
+int serverMain(int argc, char* argv[]) {
     pipe(g_exit_pipe);
     pid_t pid = fork();
     switch (pid) {
@@ -33,9 +33,17 @@ int serverMain(void) {
     printf("[INFO] %d Kirov process reporting\n", getpid());
     close(g_exit_pipe[1]);
 
-    // 读取配置文件
-    ServerConfig conf = {8080, 2};
-    parseConfig(&conf);
+    // 初始化哈希表，用于存储配置
+    HashTable ht;
+    initHashTable(&ht);
+
+    // 读取和设置配置
+    readConfig(argv[1], &ht);
+    ServerConfig conf = {"8080", 2};
+    setServerConfig(&ht, &conf);
+
+    // 初始化日志
+    initLog(&ht);
 
     // epoll
     int epfd = epoll_create(1);
@@ -48,7 +56,6 @@ int serverMain(void) {
 
     // 监听端口
     int listenfd = tcpListen(conf.port);
-    printf("[INFO] Listening on port %d\n", conf.port);
     epollAdd(epfd, listenfd);
 
     struct epoll_event* ready_events =
@@ -75,8 +82,8 @@ int serverMain(void) {
                 epollMod(epfd, connfd, EPOLLIN | EPOLLONESHOT);
 
                 // 初始化 workdir
-                char username[] = "user";
-                workdirInit(workdir_table, connfd, username);
+                char user_dir[] = "user";
+                workdirInit(workdir_table, connfd, user_dir);
 
             } else if (ready_events[i].data.fd == g_exit_pipe[0]) {
                 // 父进程传来退出信号
@@ -110,6 +117,17 @@ int serverExit(ThreadPool* pool) {
     // 主线程退出
     printf("[INFO] For home country, see you!\n");
     pthread_exit(0);
+}
+
+void setServerConfig(HashTable* ht, ServerConfig* conf) {
+    char* port = (char*)find(ht, "port");
+    if (port != NULL) {
+        strcpy(conf->port, port);
+    }
+    const char* num_str = (const char*)find(ht, "num_threads");
+    if (num_str != NULL) {
+        conf->num_threads = atoi(num_str);
+    }
 }
 
 void requestHandler(int connfd, ThreadPool* pool, WorkDir** workdir_table) {

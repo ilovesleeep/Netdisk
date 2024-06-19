@@ -1,12 +1,8 @@
-
 #include "../include/network.h"
 
 #define BACKLOG 10
 
-int tcpListen(int port) {
-    char port_str[6];
-    sprintf(port_str, "%d", port);
-
+int tcpListen(char* port) {
     struct addrinfo hints, *res;
     bzero(&hints, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
@@ -14,7 +10,7 @@ int tcpListen(int port) {
     hints.ai_flags = AI_PASSIVE;
 
     int err;
-    if ((err = getaddrinfo(NULL, port_str, &hints, &res)) == -1) {
+    if ((err = getaddrinfo(NULL, port, &hints, &res)) == -1) {
         error(1, 0, "getaddrinfo: %s", gai_strerror(err));
     }
 
@@ -59,6 +55,7 @@ int tcpListen(int port) {
         error(1, errno, "listen");
     }
 
+    log_info("Listening on port %s", port);
     return sockfd;
 }
 

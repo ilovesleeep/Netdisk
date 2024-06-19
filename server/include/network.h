@@ -2,8 +2,9 @@
 #define __NB_NETWORK_H
 
 #include "head.h"
+#include "log.h"
 
-int tcpListen(int port);
+int tcpListen(char* port);
 
 void* getIpAddr(struct sockaddr* sa);
 

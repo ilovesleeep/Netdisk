@@ -2,6 +2,7 @@
 #define __NB_BUSSINESS_H
 
 #include "head.h"
+#include "log.h"
 #include "parser.h"
 #include "shadow.h"
 
@@ -42,8 +43,5 @@ void unknownCmd(void);
 
 int taskHandler(Task* task);
 void taskFree(Task* task);
-
-
-
 
 #endif
