@@ -1,11 +1,10 @@
 #define OPENSSL_SUPPRESS_DEPRECATED
 
 #include "../include/bussiness.h"
-
+#include "../include/dbpool.h"
 #include <openssl/md5.h>
 #include <stdlib.h>
 
-#include "../include/dbconnpool.h"
 
 #define BUFSIZE 4096
 #define MAXLINE 1024
@@ -882,21 +881,3 @@ void workdirFree(WorkDir* workdir) {
     free(workdir);
 }
 
-MYSQL* getDbConnection(const char* host, const char* user, const char* password,
-                       const char* db) {
-    pthread_mutex_lock(&getdbconnection);
-    MYSQL conn;
-    MYSQL* pconn = mysql_init(&conn);
-    pconn = mysql_real_connect(&conn, host, user, password, db, 0, NULL, 0);
-    if (pconn == NULL) {
-        printf("%s\n", mysql_error(&conn));
-        return EXIT_FAILURE;
-    }
-    pthread_mutex_unlock(&getdbconnection);
-    return pconn;
-}
-
-void releaseDbConnection(MYSQL* pconn) {
-    mysql_close(pconn);
-    return;
-}
