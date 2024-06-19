@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #ifndef __NB_HEAD_H
 #define __NB_HEAD_H
 
@@ -25,6 +26,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <mysql/field_types.h>
 
 #define SIZE(a) (sizeof(a) / sizeof(a[0]))
 

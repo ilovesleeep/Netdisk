@@ -5,6 +5,7 @@
 #include "network.h"
 #include "parser.h"
 #include "threadpool.h"
+#include "dbpool.h"
 
 typedef struct {
     char port[8];
