@@ -1,7 +1,7 @@
 #include "../include/client.h"
 
 #define MAXLINE 1024
-#define MAX_USERINFO_LENGTH 256
+#define MAX_NAME_LENGTH 32
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
@@ -12,17 +12,20 @@ int main(int argc, char* argv[]) {
 
     printMenu();
 
-    char username[MAX_USERINFO_LENGTH] = {0};
-    welcome(username);
+    char username[MAX_NAME_LENGTH] = {0};
+
+    welcome(sockfd, username);
 
     return sessionHandler(sockfd, argv[1], username);
 }
 
 void printMenu(void) {
+    system("clear");
+    /*
     printf(
         "_________________________________\n"
         "|                               |\n"
-        "|   Welcome to Baidu Netdisk!   |\n"
+        "|   Welcome to NewBee Netdisk!  |\n"
         "|                               |\n"
         "|      Menu:                    |\n"
         "|           1. Login            |\n"
@@ -30,11 +33,28 @@ void printMenu(void) {
         "|           3. Exit             |\n"
         "|                        v1.0   |\n"
         "|_______________________________|\n\n");
+    */
+
+    printf(
+        "\033[1m\033[36m"
+        "                                        \n"
+        "         _   _      _      _ _     _    \n"
+        " __/\\__ | \\ | | ___| |_ __| (_)___| | __\n"
+        " \\ \033[31mN\033[36m  / |  \\| |/ _ \\ __/ _` | / __| |/ /\n"
+        " /_ \033[31mB\033[36m_\\ | |\\  |  __/ || (_| | \\__ \\   <\n"
+        "   \\/   |_| \\_|\\___|\\__\\__,_|.|___/_|\\_\\\n"
+        "                                        \n"
+        "            Menu:                       \n"
+        "                 1. Login               \n"
+        "                 2. Register            \n"
+        "                 3. Exit                \n"
+        "                                        \n"
+        "                                     v1.0\n"
+        "\033[0m"
+        "                                        \n");
 }
 
-void welcome(char* username) {
-    char password[MAX_USERINFO_LENGTH] = {0};
-
+void welcome(int sockfd, char* username) {
     int option = -1;
     while (option < 0) {
         printf("Enter option number: ");
@@ -61,11 +81,13 @@ void welcome(char* username) {
 
         switch (option) {
             case 1:
-                userLogin(username, password);
+                userLogin(sockfd, username);
                 break;
             case 2:
-                userRegister(username, password);
-                break;
+                // userRegister(sockfd, username, password);
+                printf(
+                    "Registration requires v50 to us, please contact admin\n");
+                exit(EXIT_SUCCESS);
             case 3:
                 printf("See you\n");
                 exit(EXIT_SUCCESS);
@@ -96,7 +118,10 @@ int sessionHandler(int sockfd, char* host, char* username) {
         }
 
         // 发送命令到服务器
-        send(sockfd, buf, strlen(buf) - 1, 0);
+        int buf_len = strlen(buf);
+        buf[--buf_len] = '\0';  // -1 for '\n'
+        sendn(sockfd, &buf_len, sizeof(int));
+        sendn(sockfd, buf, buf_len);
         bzero(buf, MAXLINE);
 
         // 接收服务器执行的结果
@@ -108,7 +133,7 @@ int sessionHandler(int sockfd, char* host, char* username) {
                 lsCmd(sockfd);
                 break;
             case CMD_RM:
-                rmCmd(sockfd,buf);
+                rmCmd(sockfd, buf);
                 break;
             case CMD_PWD:
                 recv(sockfd, buf, MAXLINE, 0);

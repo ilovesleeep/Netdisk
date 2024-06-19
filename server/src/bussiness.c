@@ -1,12 +1,11 @@
 #define OPENSSL_SUPPRESS_DEPRECATED
 
-#include <openssl/md5.h>
 #include "../include/bussiness.h"
 
-#include "../include/dbconnpool.h"
-
+#include <openssl/md5.h>
 #include <stdlib.h>
 
+#include "../include/dbconnpool.h"
 
 #define BUFSIZE 4096
 #define MAXLINE 1024
@@ -60,65 +59,63 @@ int sendFile(int sockfd, int fd) {
     fstat(fd, &statbuf);
     off_t fsize = statbuf.st_size;
     sendn(sockfd, &fsize, sizeof(fsize));
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
-    //接收客户端对本文件是否存在过的确认及哈希值
-    //收到客户端是否存在过的确认，若存在则检查哈希值，若不存在则直接发送
+    // 接收客户端对本文件是否存在过的确认及哈希值
+    // 收到客户端是否存在过的确认，若存在则检查哈希值，若不存在则直接发送
     int recv_stat = 0;
     recv(sockfd, &recv_stat, sizeof(int), MSG_WAITALL);
 
     off_t send_bytes = 0;
-    if(recv_stat == 1){
-        //文件存在过,检查哈希值
-        //先看看他有多大的文件
+    if (recv_stat == 1) {
+        // 文件存在过,检查哈希值
+        // 先看看他有多大的文件
         recvn(sockfd, &send_bytes, sizeof(send_bytes));
         unsigned char md5sum_client[16];
         recvn(sockfd, md5sum_client, sizeof(md5sum_client));
-        if(send_bytes > statbuf.st_size){
-            //我服务器的文件都没那么大,你哪来那么大,我给你重发一个
+        if (send_bytes > statbuf.st_size) {
+            // 我服务器的文件都没那么大,你哪来那么大,我给你重发一个
             send_bytes = 0;
-        }
-        else{
-            //先根据收到的文件大小计算自己的哈希值(服务器的文件不可能有文件空洞)
+        } else {
+            // 先根据收到的文件大小计算自己的哈希值(服务器的文件不可能有文件空洞)
             MD5_CTX ctx;
             MD5_Init(&ctx);
-            for(off_t curr = 0; curr < send_bytes; curr += MMAPSIZE){
-                if(curr + MMAPSIZE <= send_bytes){
-                    char* p = mmap(NULL, MMAPSIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, curr);
+            for (off_t curr = 0; curr < send_bytes; curr += MMAPSIZE) {
+                if (curr + MMAPSIZE <= send_bytes) {
+                    char* p = mmap(NULL, MMAPSIZE, PROT_READ | PROT_WRITE,
+                                   MAP_SHARED, fd, curr);
                     MD5_Update(&ctx, p, MMAPSIZE);
                     munmap(p, MMAPSIZE);
-                }
-                else{
+                } else {
                     int surplus = send_bytes - curr;
-                    char* p = mmap(NULL, surplus, PROT_READ | PROT_WRITE, MAP_SHARED, fd, curr);
+                    char* p = mmap(NULL, surplus, PROT_READ | PROT_WRITE,
+                                   MAP_SHARED, fd, curr);
                     MD5_Update(&ctx, p, surplus);
                     munmap(p, surplus);
                     break;
                 }
             }
-            //生成MD5值
+            // 生成MD5值
             unsigned char md5sum[16];
             MD5_Final(md5sum, &ctx);
 
-            //比较
-            if(memcmp(md5sum_client, md5sum, sizeof(md5sum)) == 0){
-                //是一个文件(＾－＾),继续发送叭
+            // 比较
+            if (memcmp(md5sum_client, md5sum, sizeof(md5sum)) == 0) {
+                // 是一个文件(＾－＾),继续发送叭
                 int send_stat = 0;
                 sendn(sockfd, &send_stat, sizeof(int));
-            }
-            else{
-                //不是一个文件,重新来过吧
+            } else {
+                // 不是一个文件,重新来过吧
                 int send_stat = 1;
                 sendn(sockfd, &send_stat, sizeof(int));
                 send_bytes = 0;
             }
-
         }
     }
-    #pragma GCC diagnostic pop
-    //此时send_bytes对应正确的开始发送位置
-    // 发送文件内容
+#pragma GCC diagnostic pop
+    // 此时send_bytes对应正确的开始发送位置
+    //  发送文件内容
     if (fsize >= BIGFILE_SIZE) {
         // 大文件
         while (send_bytes < fsize) {
@@ -127,7 +124,7 @@ int sendFile(int sockfd, int fd) {
 
             void* addr =
                 mmap(NULL, length, PROT_READ, MAP_SHARED, fd, send_bytes);
-            if(sendn(sockfd, addr, length) == -1){
+            if (sendn(sockfd, addr, length) == -1) {
                 close(fd);
                 return 1;
             }
@@ -179,64 +176,63 @@ int recvFile(int sockfd, char* path) {
     off_t fsize;
     recvn(sockfd, &fsize, sizeof(fsize));
     off_t recv_bytes = 0;
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
-    //检查0为没有存在过,1为存在过
+    // 检查0为没有存在过,1为存在过
     struct stat statbuf;
     fstat(fd, &statbuf);
-    if(statbuf.st_size < MMAPSIZE){
-        //没有存在过(小于MMAPSIZE都当没存在过处理,不差那1M流量,懒得再算哈希值)
+    if (statbuf.st_size < MMAPSIZE) {
+        // 没有存在过(小于MMAPSIZE都当没存在过处理,不差那1M流量,懒得再算哈希值)
         int send_stat = 0;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-    }
-    else{
-        //存在过,检查哈希值,检查哈希值全部以MMAPSIZE为单位来查找
+    } else {
+        // 存在过,检查哈希值,检查哈希值全部以MMAPSIZE为单位来查找
         int send_stat = 1;
         sendn(sockfd, &send_stat, sizeof(int));
-        //计算哈希值
+        // 计算哈希值
         char empty[MMAPSIZE] = {0};
         MD5_CTX ctx;
         MD5_Init(&ctx);
-        
-        //prev是后面即将要用的数据,每次计算确认当前数据可用时才为其赋值
+
+        // prev是后面即将要用的数据,每次计算确认当前数据可用时才为其赋值
         off_t prev_bytes = 0;
         MD5_CTX prev_ctx;
-        for(recv_bytes = 0; recv_bytes < statbuf.st_size; recv_bytes += MMAPSIZE){
-            if(recv_bytes + MMAPSIZE <= statbuf.st_size){
-                //当前大小小于文件大小,计算
-                char* p = mmap(NULL, MMAPSIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, recv_bytes);
-                if(memcmp(p, empty, MMAPSIZE) == 0){
-                    //文件空洞,计算到此为止,就用上一次的哈希值和recv_bytes
+        for (recv_bytes = 0; recv_bytes < statbuf.st_size;
+             recv_bytes += MMAPSIZE) {
+            if (recv_bytes + MMAPSIZE <= statbuf.st_size) {
+                // 当前大小小于文件大小,计算
+                char* p = mmap(NULL, MMAPSIZE, PROT_READ | PROT_WRITE,
+                               MAP_SHARED, fd, recv_bytes);
+                if (memcmp(p, empty, MMAPSIZE) == 0) {
+                    // 文件空洞,计算到此为止,就用上一次的哈希值和recv_bytes
                     memcpy(&ctx, &prev_ctx, sizeof(ctx));
                     recv_bytes = prev_bytes;
                     munmap(p, MMAPSIZE);
                     break;
-                }
-                else{
-                    //非文件空洞,继续计算
+                } else {
+                    // 非文件空洞,继续计算
                     memcpy(&prev_ctx, &ctx, sizeof(ctx));
                     prev_bytes = recv_bytes;
 
                     MD5_Update(&ctx, p, MMAPSIZE);
                     munmap(p, MMAPSIZE);
                 }
-            }
-            else{
-                //继续mmap这个大小就要超啦,看看最后一点一不一样
+            } else {
+                // 继续mmap这个大小就要超啦,看看最后一点一不一样
                 int surplus = statbuf.st_size - recv_bytes;
-                char* p = mmap(NULL, surplus, PROT_READ | PROT_WRITE, MAP_SHARED, fd, recv_bytes);
+                char* p = mmap(NULL, surplus, PROT_READ | PROT_WRITE,
+                               MAP_SHARED, fd, recv_bytes);
                 char* empty = calloc(surplus, sizeof(char));
-                if(memcmp(p, empty, surplus) == 0){
+                if (memcmp(p, empty, surplus) == 0) {
                     free(empty);
-                    //文件空洞,计算到此为止,就用上一次的哈希值和recv_bytes
+                    // 文件空洞,计算到此为止,就用上一次的哈希值和recv_bytes
                     memcpy(&ctx, &prev_ctx, sizeof(ctx));
                     recv_bytes = prev_bytes;
                     munmap(p, surplus);
                     break;
-                }
-                else{
-                    //非文件空洞,全部都是有效信息,计算所有的哈希值,offset移动到末尾
+                } else {
+                    // 非文件空洞,全部都是有效信息,计算所有的哈希值,offset移动到末尾
                     free(empty);
 
                     recv_bytes += surplus;
@@ -247,24 +243,24 @@ int recvFile(int sockfd, char* path) {
                 }
             }
         }
-        //生成哈希值
+        // 生成哈希值
         unsigned char md5sum[16];
         MD5_Final(md5sum, &ctx);
-        //发送文件实际大小及哈希值
+        // 发送文件实际大小及哈希值
         sendn(sockfd, &recv_bytes, sizeof(recv_bytes));
         sendn(sockfd, md5sum, sizeof(md5sum));
 
-        //看看文件是不是一样的呀
+        // 看看文件是不是一样的呀
         int recv_stat = 0;
         recvn(sockfd, &recv_stat, sizeof(int));
-        if(recv_stat == 1){
-            //糟糕!文件不一样
+        if (recv_stat == 1) {
+            // 糟糕!文件不一样
             recv_bytes = 0;
         }
-        //文件一样,recv_bytes指向的是开始接收的位置
+        // 文件一样,recv_bytes指向的是开始接收的位置
     }
-    #pragma GCC diagnostic pop
-    //此时recv_bytes对应正确的开始接收位置
+#pragma GCC diagnostic pop
+    // 此时recv_bytes对应正确的开始接收位置
 
     // 接收文件内容
     if (fsize >= BIGFILE_SIZE) {
@@ -355,6 +351,11 @@ int cdCmd(Task* task) {
     }
     closedir(pdir);
 
+    // 备份，越权时回退
+    char* path_bak = strdup(wd->path);
+    int index_bak[MAXLINE] = {0};
+    memcpy(&index_bak, wd->index, MAXLINE * sizeof(int));
+
     // 更新 WorkDir
     char* tmp = strdup(task->args[1]);
     char* token = strtok(tmp, "/");
@@ -370,6 +371,14 @@ int cdCmd(Task* task) {
                 strcpy(msg, "Permission denied");
                 sendn(task->fd, msg, strlen(msg));
                 free(tmp);
+
+                log_warn("[%s] want to escape", wd->name);
+
+                // 回退
+                strcpy(wd->path, path_bak);
+                free(path_bak);
+                memcpy(wd->index, &index_bak, MAXLINE * sizeof(int));
+
                 return -1;
             }
 
@@ -486,8 +495,6 @@ void rmCmd(Task* task) {
     // TODO:
     // 删除每一个目录项
     // 校验参数，发送校验结果，若为错误则发送错误信息
-    int send_status = 0;
-    char msg[MAXLINE] = {0};
     if (task->args[2] != NULL) {
         int sendstat = 1;  // 错误
         send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
@@ -495,7 +502,7 @@ void rmCmd(Task* task) {
         int info_len = strlen(error_info);
         send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
         send(task->fd, error_info, info_len, MSG_NOSIGNAL);
-        return -1;
+        return;
     } else {
         int sendstat = 0;  // 正确
         send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
@@ -515,17 +522,18 @@ void rmCmd(Task* task) {
     if (remove(dir) == 0) {
         printf("Successfully deleted %s\n", dir);
         int send_stat = 0;
-        send(task->fd,&send_stat,sizeof(int),MSG_NOSIGNAL);
+        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
     } else if ((errnum = deleteDir(dir)) == 0) {
         printf("Successfully deleted %s\n", dir);
         int send_stat = 0;
-        send(task->fd,&send_stat,sizeof(int),MSG_NOSIGNAL);
+        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
     }
 
     // 如果删除不存在的目录，则返回报错信息
-    send_status = 1;
+    int send_status = 1;
+    char msg[MAXLINE] = {0};
     if (errnum == ENOENT) {
-        send(task->fd,&send_status,sizeof(int),MSG_NOSIGNAL);
+        send(task->fd, &send_status, sizeof(int), MSG_NOSIGNAL);
         strcpy(msg, strerror(errno));
         int info_len = strlen(msg);
         send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
@@ -595,8 +603,9 @@ int getsCmd(Task* task) {
         DataBlock block;
         strcpy(block.data, *parameter);
         block.length = strlen(*parameter);
-        sendn(task->fd, &block, sizeof(int) + block.length);        
-        if(sendFile(task->fd, fd) == 1) {//sendfile中close了fd,若返回值为1证明连接中断,则不进行剩余发送任务
+        sendn(task->fd, &block, sizeof(int) + block.length);
+        if (sendFile(task->fd, fd) ==
+            1) {  // sendfile中close了fd,若返回值为1证明连接中断,则不进行剩余发送任务
             return 1;
         }
     }
@@ -611,8 +620,7 @@ int getsCmd(Task* task) {
 }
 
 int putsCmd(Task* task) {
-
-    //默认存放在当前目录
+    // 默认存放在当前目录
     char path[1000] = {0};
     WorkDir* pathbase = task->wd_table[task->fd];
     strncpy(path, pathbase->path, pathbase->index[pathbase->index[0]] + 1);
@@ -633,7 +641,7 @@ int putsCmd(Task* task) {
             break;
         }
 
-        if(recvFile(task->fd, path) == 1){
+        if (recvFile(task->fd, path) == 1) {
             return 1;
         }
     }
@@ -642,15 +650,14 @@ int putsCmd(Task* task) {
 }
 
 void mkdirCmd(Task* task) {
-    if (task->args[1] == NULL) { // missing operand
+    if (task->args[1] == NULL) {  // missing operand
         char errmsg[MAXLINE] = "mkdir: missing operand";
         send(task->fd, errmsg, strlen(errmsg), 0);
         // 后面补日志
         error(0, errno, "%d mkdir:", task->fd);
         return;
-    } 
+    }
 
-    
     // if (sizeof(task ->args[1]) >= 1000) {
     //     error(1, 0, "mkdir_dirlen too long!");
     // }
@@ -710,11 +717,94 @@ void mkdirCmd(Task* task) {
     return;
 }
 
-void exitCmd(void) {
-    // TODO:
+static void getSetting(char* setting, char* passwd) {
+    int i, j;
+    // 取出salt,i 记录密码字符下标，j记录$出现次数
+    for (i = 0, j = 0; passwd[i] && j != 4; ++i) {
+        if (passwd[i] == '$') ++j;
+    }
+    strncpy(setting, passwd, i);
+}
 
+void loginCheck1(Task* task) {
+    printf("[INFO] loginCheck1 start\n");
+    log_info("user to login: [%s]", task->args[1]);
+
+    struct spwd* sp = getspnam(task->args[1]);
+
+    // 0: 存在, 1: 不存在
+    // 暂时先用数字，后面用 enum
+    int user_stat = 0;
+    if (sp == NULL) {
+        // 用户不存在
+        user_stat = 1;
+        sendn(task->fd, &user_stat, sizeof(int));
+        return;
+    }
+
+    // 用户存在
+    sendn(task->fd, &user_stat, sizeof(int));
+    WorkDir* wd = task->wd_table[task->fd];
+    // 更新 path
+    bzero(wd->path, MAXLINE);
+    sprintf(wd->path, "user/%s", task->args[1]);
+    // 为用户创建家目录
+    mkdir(wd->path, 0777);
+    // 更新 index
+    wd->index[1] = strlen(wd->path) - 1;
+    /*
+    // 执行 mkdir
+    char tmp_req[MAXLINE] = {0};
+    sprintf(tmp_req, "mkdir user/%s", task->args[1]);
+    Task* tmp_task = (Task*)malloc(sizeof(Task));
+    tmp_task->fd = task->fd;
+    tmp_task->args = parseRequest(tmp_req);
+    tmp_task->wd_table = task->wd_table;
+    mkdirCmd(tmp_task);
+    taskFree(tmp_task);
+    */
+
+    // 保存用户名
+    strcpy(wd->name, task->args[1]);
+
+    char setting[128] = {0};
+    // 保存加密密文
+    strcpy(wd->encrypted, sp->sp_pwdp);
+    // 提取 setting
+    getSetting(setting, sp->sp_pwdp);
+
+    int setting_len = strlen(setting);
+    sendn(task->fd, &setting_len, sizeof(int));
+    sendn(task->fd, setting, setting_len);
+
+    printf("[INFO] loginCheck1 end\n");
     return;
 }
+
+void loginCheck2(Task* task) {
+    printf("[INFO] loginCheck2 start\n");
+
+    // printf("[INFO] user passwd: <%s>\n", task->args[1]);
+
+    int user_stat = 0;
+    WorkDir* wd = task->wd_table[task->fd];
+
+    if (strcmp(wd->encrypted, task->args[1]) == 0) {
+        // 登录成功
+        sendn(task->fd, &user_stat, sizeof(int));
+        log_info("[%s] login successfully", wd->name);
+    } else {
+        // 登录失败，密码错误
+        user_stat = 1;
+        sendn(task->fd, &user_stat, sizeof(int));
+        log_warn("[%s] login failed", wd->name);
+    }
+
+    printf("[INFO] loginCheck2 end\n");
+    return;
+}
+
+void registerCmd(Task* task) { return; }
 
 void unknownCmd(void) {
     // TODO:
@@ -746,8 +836,14 @@ int taskHandler(Task* task) {
         case CMD_PUTS:
             retval = putsCmd(task);
             break;
-        case CMD_EXIT:
-            exitCmd();
+        case CMD_LOGIN1:
+            loginCheck1(task);
+            break;
+        case CMD_LOGIN2:
+            loginCheck2(task);
+            break;
+        case CMD_REGISTER:
+            registerCmd(task);
             break;
         default:
             unknownCmd();
@@ -774,6 +870,9 @@ void workdirInit(WorkDir** workdir_table, int connfd, char* username) {
     strcpy(workdir_table[connfd]->path, username);
     workdir_table[connfd]->index[0] = 1;
     workdir_table[connfd]->index[1] = strlen(username) - 1;
+
+    strcpy(workdir_table[connfd]->name, "");
+    strcpy(workdir_table[connfd]->encrypted, "");
 }
 
 void workdirFree(WorkDir* workdir) {
@@ -782,7 +881,8 @@ void workdirFree(WorkDir* workdir) {
     free(workdir);
 }
 
-MYSQL* getDbConnection(const char* host, const char* user, const char* password, const char* db) {
+MYSQL* getDbConnection(const char* host, const char* user, const char* password,
+                       const char* db) {
     pthread_mutex_lock(&getdbconnection);
     MYSQL conn;
     MYSQL* pconn = mysql_init(&conn);

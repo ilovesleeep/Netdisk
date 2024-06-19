@@ -4,6 +4,7 @@
 #include "blockq.h"
 #include "bussiness.h"
 #include "head.h"
+#include "log.h"
 #include "network.h"
 
 typedef struct {
