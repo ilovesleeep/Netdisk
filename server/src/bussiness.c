@@ -586,11 +586,10 @@ int getsCmd(Task* task) {
     while (*(++parameter)) {
         static int i = 0;  // 第一个文件
         i++;
-
-        char file_name[128] = {0};
-        int target_pwdid = pwdid;
-        for(char* p = parameter[i]; *p; p++){
-            for(char* start = p; *p != '/' && *p != '\0'; p++){
+        char file_name[512] = {0};
+        for(char* p = parameter; *p; p++){
+            int target_pwdid = pwdid;
+            for(char* start = p; *p != '\0' && *p != '/'; p++){
                 if(*(p + 1) == '/'){
                     bzero(file_name, sizeof(file_name));
                     strncpy(file_name, start, p - start + 1);
@@ -600,15 +599,21 @@ int getsCmd(Task* task) {
                         //***消息对接***
                         return 0;
                     }
-                    break;
                 }
-                if(*(p + 1) == '\0'){
+                else if(*(p + 1) == '\0'){
+                    //此时start是文件名,
                     strcpy(file_name, start);
                     break;
                 }
             }
         }
         //此时file_name即文件名
+
+
+
+
+
+
 
         int fd = open(path_file, O_RDWR);
         // 检查文件是否存在
