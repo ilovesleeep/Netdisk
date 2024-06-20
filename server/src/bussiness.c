@@ -6,7 +6,6 @@
 #include <stdlib.h>
 
 #include "../include/dbpool.h"
-
 #include "../include/mysqloperate.h"
 
 #define BUFSIZE 4096
@@ -409,14 +408,16 @@ int cdCmd(Task* task) {
 }
 
 void lsCmd(Task* task) {
+
     // 校验参数,发送校验结果，若为错误则继续发送错误信息
     if (task->args[1] != NULL) {
         int sendstat = 1;
         send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
-        char error_info[] = "parameter number error";
+        char* error_info = "parameter number error";
         int info_len = strlen(error_info);
         send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
         send(task->fd, error_info, info_len, MSG_NOSIGNAL);
+        log_error("lsCmd: parameter number error");
         return;
     } else {
         int sendstat = 0;
@@ -424,127 +425,169 @@ void lsCmd(Task* task) {
     }
 
     // 获取当前路径
-    char path[1000] = {0};
-    WorkDir* pathbase = task->wd_table[task->fd];
-    strncpy(path, pathbase->path, pathbase->index[pathbase->index[0]] + 1);
+    MYSQL* mysql = getDBConnection(task->dbpool); 
+    // int pwdid = getPwdId(mysql, task->uid);
+    int pwdid = 1;
+    char** family = findchild(mysql, pwdid);
+    releaseDBConnection(task->dbpool, mysql);
 
-    // 打开目录
-    DIR* dir = opendir(pathbase->path);
+    // bufsize = 4096
+    char result[BUFSIZE] = {0};
 
-    // 发送文件信息
-    struct dirent* p = NULL;
-    while ((p = readdir(dir))) {
-        if (strcmp(p->d_name, ".") == 0 || strcmp(p->d_name, "..") == 0) {
-            continue;
-        }
-        int info_len = strlen(p->d_name);
-        char send_info[1000] = {0};
-        strcpy(send_info, p->d_name);
-        // 发送文件名长度及文件名
-        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-        send(task->fd, send_info, info_len, MSG_NOSIGNAL);
+    while (*family != NULL) {
+        strncat(result, *family, sizeof(result) - strlen(*family) - 1);
+        strncat(result, "\t", sizeof(result) - strlen("\t"));
+        family++;
     }
-    // 发送int类型的0(这个文件名长度为0)代表文件已发完
-    int info_len = 0;
+
+    for (int i = 0; family[i] != NULL; ++i) {
+        free(family);
+    }
+    free(family);
+    
+    // 发送（大火车）
+    int info_len = strlen(result);
     send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+    send(task->fd, result, info_len, MSG_NOSIGNAL);
+
     return;
 }
 
-// 使用单独的函数来实现命令的功能
-int deleteDir(const char* dir) {
-    // 打开目录
-    DIR* stream = opendir(dir);
-    if (stream == NULL) {
-        if (errno == ENOENT) {
-            fprintf(stderr, "rm: 无法删除'%s' : 没有那个文件或者目录\n", dir);
-            return errno;
-        }
-    }
+// // 使用单独的函数来实现命令的功能
+// int deleteDir(const char* dir) {
+//     // 打开目录
+//     DIR* stream = opendir(dir);
+//     if (stream == NULL) {
+//         if (errno == ENOENT) {
+//             fprintf(stderr, "rm: 无法删除'%s' : 没有那个文件或者目录\n",
+//             dir); return errno;
+//         }
+//     }
 
-    // 遍历目录流，依次删除每一个目录项
-    errno = 0;
-    struct dirent* pdirent;
-    while ((pdirent = readdir(stream)) != NULL) {
-        // 忽略.和..
-        char* name = pdirent->d_name;
-        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
-            continue;
-        }
+//     // 遍历目录流，依次删除每一个目录项
+//     errno = 0;
+//     struct dirent* pdirent;
+//     while ((pdirent = readdir(stream)) != NULL) {
+//         // 忽略.和..
+//         char* name = pdirent->d_name;
+//         if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
+//             continue;
+//         }
 
-        // 注意，这里才开始拼接路径
-        char subpath[MAXLINE];
-        sprintf(subpath, "%s/%s", dir, name);
-        if (pdirent->d_type == DT_DIR) {
-            // 拼接路径
-            deleteDir(subpath);
-        } else if (pdirent->d_type == DT_REG) {
-            unlink(subpath);
-        }
-    }
+//         // 注意，这里才开始拼接路径
+//         char subpath[MAXLINE];
+//         sprintf(subpath, "%s/%s", dir, name);
+//         if (pdirent->d_type == DT_DIR) {
+//             // 拼接路径
+//             deleteDir(subpath);
+//         } else if (pdirent->d_type == DT_REG) {
+//             unlink(subpath);
+//         }
+//     }
 
-    // 关闭目录流
-    closedir(stream);
+//     // 关闭目录流
+//     closedir(stream);
 
-    if (errno) {
-        error(1, errno, "readdir");
-    }
-    // 再删除该目录
-    rmdir(dir);
+//     if (errno) {
+//         error(1, errno, "readdir");
+//     }
+//     // 再删除该目录
+//     rmdir(dir);
+
+//     return 0;
+// }
+
+// void rmCmd(Task* task) {
+//     // TODO:
+//     // 删除每一个目录项
+//     // 校验参数，发送校验结果，若为错误则发送错误信息
+//     if (task->args[2] != NULL) {
+//         int sendstat = 1;  // 错误
+//         send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
+//         char error_info[] = "parameter number error";
+//         int info_len = strlen(error_info);
+//         send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+//         send(task->fd, error_info, info_len, MSG_NOSIGNAL);
+//         return;
+//     } else {
+//         int sendstat = 0;  // 正确
+//         send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
+//     }
+
+//     // 获取当前路径
+//     char curr_path[MAXLINE] = {0};
+//     WorkDir* wd = task->wd_table[task->fd];
+//     strncpy(curr_path, wd->path, strlen(wd->path));
+
+//     // 拼接路径
+//     char dir[2 * MAXLINE] = {0};
+//     sprintf(dir, "%s/%s", curr_path, task->args[1]);
+
+//     // 使用deleteDir函数删除文件
+//     int errnum;
+//     if (remove(dir) == 0) {
+//         printf("Successfully deleted %s\n", dir);
+//         int send_stat = 0;
+//         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+//     } else if ((errnum = deleteDir(dir)) == 0) {
+//         printf("Successfully deleted %s\n", dir);
+//         int send_stat = 0;
+//         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+//     }
+
+//     // 如果删除不存在的目录，则返回报错信息
+//     int send_status = 1;
+//     char msg[MAXLINE] = {0};
+//     if (errnum == ENOENT) {
+//         send(task->fd, &send_status, sizeof(int), MSG_NOSIGNAL);
+//         strcpy(msg, strerror(errno));
+//         int info_len = strlen(msg);
+//         send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+//         send(task->fd, msg, info_len, MSG_NOSIGNAL);
+//         return;
+//     }
+
+//     return;
+// }
+
+int deleteDir(int id,char *type){
+
 
     return 0;
 }
 
+
 void rmCmd(Task* task) {
     // TODO:
-    // 删除每一个目录项
-    // 校验参数，发送校验结果，若为错误则发送错误信息
-    if (task->args[2] != NULL) {
-        int sendstat = 1;  // 错误
-        send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
-        char error_info[] = "parameter number error";
-        int info_len = strlen(error_info);
-        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-        send(task->fd, error_info, info_len, MSG_NOSIGNAL);
-        return;
-    } else {
-        int sendstat = 0;  // 正确
-        send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
-    }
-
-    // 获取当前路径
-    char curr_path[MAXLINE] = {0};
-    WorkDir* wd = task->wd_table[task->fd];
-    strncpy(curr_path, wd->path, strlen(wd->path));
-
-    // 拼接路径
-    char dir[2 * MAXLINE] = {0};
-    sprintf(dir, "%s/%s", curr_path, task->args[1]);
-
-    // 使用deleteDir函数删除文件
-    int errnum;
-    if (remove(dir) == 0) {
-        printf("Successfully deleted %s\n", dir);
-        int send_stat = 0;
-        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-    } else if ((errnum = deleteDir(dir)) == 0) {
-        printf("Successfully deleted %s\n", dir);
-        int send_stat = 0;
-        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-    }
-
-    // 如果删除不存在的目录，则返回报错信息
-    int send_status = 1;
-    char msg[MAXLINE] = {0};
-    if (errnum == ENOENT) {
-        send(task->fd, &send_status, sizeof(int), MSG_NOSIGNAL);
-        strcpy(msg, strerror(errno));
-        int info_len = strlen(msg);
-        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-        send(task->fd, msg, info_len, MSG_NOSIGNAL);
-        return;
-    }
-
-    return;
+    // 删除文件及目录。
+    // 如果删除的是文件，则直接将它的exist设为“0”。
+    // 如果删除的是目录，则需要查看它是否存在子目录。需要遍历父目录id，找到和本目录id相等的行。
+    // 并且递归查询下去，直到找到一个目录项不是当前目录id为止，并将它们的exist类型都设置为“0”。
+    MYSQL *mysql;
+    int pwdid;
+    pwdid = getPwdId(mysql,task->uid);
+    char pwd = getPwd(mysql,pwdid);
+    
+    char type;
+    type = getTypeById(mysql,pwdid);
+     
+    // // 获取类型
+    // if(strcmp(type,'f') == 0){
+    //     // 类型为file
+    //     char sql[60] = {0};
+    //     sprintf(sql,"update nb_netdisk set exist='0' where id=%d",pwdid);
+    //     int res = mysql_query(mysql,sql);
+    //     if(res != 0){
+    //         log_error("set exist='0' failed.");
+    //         error(1,0,"[ERROR] set exist='0' failed\n");
+    //     }
+    // }else if(strcmp(type,'d') == 0){
+    //     // 类型是directory
+    //     char **child = findchild(mysql,pwdid);
+    //     while(*child != NULL){
+    //         rmCmd(*child)
+    //     }
+    // }
 }
 
 void pwdCmd(Task* task) {
@@ -559,7 +602,6 @@ void pwdCmd(Task* task) {
 }
 
 int getsCmd(Task* task) {
-    
     // 确认参数数量是否正确
     if (task->args[1] == NULL) {
         int send_stat = 1;
@@ -574,42 +616,69 @@ int getsCmd(Task* task) {
         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
     }
 
-
-
-    //获取一个mysql连接
+    // 获取一个mysql连接
     MYSQL* mysql = getDBConnection(task->dbpool);
-    //获取当前路径
+    // 获取当前路径
     int pwdid = getPwdId(mysql, task->uid);
 
     // 发送文件
     char** parameter = task->args;
-    while (*(++parameter)) {
-        static int i = 0;  // 第一个文件
-        i++;
-
-        char file_name[128] = {0};
+    for(int i = 1; parameter[i]; i++){
+        char file_name[512] = {0};
         int target_pwdid = pwdid;
-        for(char* p = parameter[i]; *p; p++){
-            for(char* start = p; *p != '/' && *p != '\0'; p++){
+        for(char* p = parameter[i]; *p != '\0'; p++){
+            for(char* start = p; *p != '\0' && *p != '/'; p++){
                 if(*(p + 1) == '/'){
                     bzero(file_name, sizeof(file_name));
                     strncpy(file_name, start, p - start + 1);
-                    target_pwdid = goToRelativeDir(mysql, target_pwdid, file_name);
-                    if(target_pwdid == -1){
-                        //路径错误
+                    target_pwdid =
+                        goToRelativeDir(mysql, target_pwdid, file_name);
+                    if (target_pwdid == -1) {
+                        // 路径错误
                         //***消息对接***
+                        int send_stat = 1;
+                        sendn(task->fd, &send_stat, sizeof(int));
+                        char send_info = "path not exist";
+                        int info_len = strlen(send_info);
+                        sendn(task->fd, &info_len, sizeof(int));
+                        sendn(task->fd, send_info, info_len);
+                        //资源释放
+                        releaseDBConnection(task->dbpool, mysql);
                         return 0;
                     }
-                    break;
                 }
-                if(*(p + 1) == '\0'){
+                else if(*(p + 1) == '\0'){
+                    //此时start是文件名,target_pwdid为待插入项的父目录id
+                    char type;
+                    target_pwdid = goToRelativeDir(mysql, target_pwdid, file_name, &type);
+                    if(type == 'D'){
+                        //最后文件名对应的是一个路径,本网盘暂不支持传输文件夹功能
+                        //***消息对接***
+                        int send_stat = 1;
+                        sendn(task->fd, &send_stat, sizeof(int));
+                        char send_info = "Don't support transmiting directory";
+                        int info_len = strlen(send_info);
+                        sendn(task->fd, &info_len, sizeof(int));
+                        sendn(task->fd, send_info, info_len);
+                        //资源释放
+                        releaseDBConnection(task->dbpool, mysql);
+                        return 0;
+                    }
                     strcpy(file_name, start);
                     break;
                 }
             }
         }
-        //此时file_name即文件名
+        //此时file_name即文件名,target_pwdid为待插入项的id
+        //检查文件是否完整(不用检查了,我只会将完整的文件目录项设为1)
+        
 
+
+
+
+
+
+        char* path_file = NULL;
         int fd = open(path_file, O_RDWR);
         // 检查文件是否存在
         // 不存在
@@ -681,10 +750,16 @@ void mkdirCmd(Task* task) {
     if (task->args[1] == NULL) {  // missing operand
         char errmsg[MAXLINE] = "mkdir: missing operand";
         send(task->fd, errmsg, strlen(errmsg), 0);
-        // 后面补日志
+        log_error("mkdirCmd: missing operand");
         error(0, errno, "%d mkdir:", task->fd);
         return;
     }
+
+
+
+
+
+
 
     // if (sizeof(task ->args[1]) >= 1000) {
     //     error(1, 0, "mkdir_dirlen too long!");
@@ -745,115 +820,20 @@ void mkdirCmd(Task* task) {
     return;
 }
 
-static void getSetting(char* setting, char* passwd) {
-    int i, j;
-    // 取出salt,i 记录密码字符下标，j记录$出现次数
-    for (i = 0, j = 0; passwd[i] && j != 4; ++i) {
-        if (passwd[i] == '$') ++j;
-    }
-    strncpy(setting, passwd, i);
-}
-
 void loginCheck1(Task* task) {
-    printf("[INFO] loginCheck1 start\n");
+    log_debug("loginCheck1 start");
     log_info("user to login: [%s]", task->args[1]);
 
-    struct spwd* sp = getspnam(task->args[1]);
+    char* username = task->args[1];
 
-    // 0: 存在, 1: 不存在
-    // 暂时先用数字，后面用 enum
-    int user_stat = 0;
-    if (sp == NULL) {
-        // 用户不存在
-        user_stat = 1;
-        sendn(task->fd, &user_stat, sizeof(int));
-        return;
-    }
-
-    // 用户存在
-    sendn(task->fd, &user_stat, sizeof(int));
-    WorkDir* wd = task->wd_table[task->fd];
-    // 更新 path
-    bzero(wd->path, MAXLINE);
-    sprintf(wd->path, "user/%s", task->args[1]);
-    // 为用户创建家目录
-    mkdir(wd->path, 0777);
-    // 更新 index
-    wd->index[1] = strlen(wd->path) - 1;
-
-    // 保存用户名
-    strcpy(wd->name, task->args[1]);
-
-    char setting[128] = {0};
-    // 保存加密密文
-    strcpy(wd->encrypted, sp->sp_pwdp);
-    // 提取 setting
-    getSetting(setting, sp->sp_pwdp);
-
-    int setting_len = strlen(setting);
-    sendn(task->fd, &setting_len, sizeof(int));
-    sendn(task->fd, setting, setting_len);
-
-    printf("[INFO] loginCheck1 end\n");
-    return;
-}
-
-void loginCheck2(Task* task) {
-    printf("[INFO] loginCheck2 start\n");
-
-    // printf("[INFO] user passwd: <%s>\n", task->args[1]);
-
-    int user_stat = 0;
-    WorkDir* wd = task->wd_table[task->fd];
-
-    if (strcmp(wd->encrypted, task->args[1]) == 0) {
-        // 登录成功
-        sendn(task->fd, &user_stat, sizeof(int));
-        log_info("[%s] login successfully", wd->name);
-    } else {
-        // 登录失败，密码错误
-        user_stat = 1;
-        sendn(task->fd, &user_stat, sizeof(int));
-        log_warn("[%s] login failed", wd->name);
-    }
-
-    printf("[INFO] loginCheck2 end\n");
-    return;
-}
-
-static void generateSalt();
-
-void regCheck1(Task* task) {
-    printf("[INFO] regCheck1 start\n");
-    log_info("user to register: [%s]", task->args[1]);
-
-    //___________________________________________
-    // 查数据库，用户名是否存在
-    MYSQL* pconn = getDBConnection(task->dbpool);
-
-    char sql[] = "SELECT * FROM t_user_0614 WHERE id > 0";
-    int err = mysql_query(pconn, sql);
-    if (err) {
-        error(1, 0, "[ERROR] (%d, %s)\n", mysql_errno(pconn),
-              mysql_error(pconn));
-    }
-
-    MYSQL_RES* res = mysql_store_result(pconn);
-    printf("rows: %llu\n", mysql_num_rows(res));
-
-    MYSQL_ROW row;
-    while ((row = mysql_fetch_row(res)) != NULL) {
-        int num_fields = mysql_num_fields(res);
-        for (int i = 0; i < num_fields; ++i) {
-            printf("%s\t", row[i]);
-        }
-        putchar('\n');
-    }
-    /*
-    //___________________________________________
-    // 0: 用户名可用, 1: 用户名不可用
+    // 0：成功，1：失败
     int status_code = 0;
-    if (sp == NULL) {
+    MYSQL* pconn = getDBConnection(task->dbpool);
+    int exist = userExist(pconn, username);
+    log_info("[%s] exist = [%d]", task->args[1], exist);
+
+    if (exist == 0) {
+        releaseDBConnection(task->dbpool, pconn);
         // 用户不存在
         status_code = 1;
         sendn(task->fd, &status_code, sizeof(int));
@@ -862,53 +842,133 @@ void regCheck1(Task* task) {
 
     // 用户存在
     sendn(task->fd, &status_code, sizeof(int));
-    WorkDir* wd = task->wd_table[task->fd];
-    // 更新 path
-    bzero(wd->path, MAXLINE);
-    sprintf(wd->path, "user/%s", task->args[1]);
-    // 为用户创建家目录
-    mkdir(wd->path, 0777);
-    // 更新 index
-    wd->index[1] = strlen(wd->path) - 1;
 
-    // 保存用户名
-    strcpy(wd->name, task->args[1]);
+    // 获取 uid
+    int uid = getUserIDByUsername(pconn, username);
 
-    char setting[128] = {0};
-    // 保存加密密文
-    strcpy(wd->encrypted, sp->sp_pwdp);
-    // 提取 setting
-    getSetting(setting, sp->sp_pwdp);
+    // 查询 cryptpasswd
+    char* cryptpasswd = getCryptpasswdByUID(pconn, uid);
+    releaseDBConnection(task->dbpool, pconn);
 
-    int setting_len = strlen(setting);
-    sendn(task->fd, &setting_len, sizeof(int));
-    sendn(task->fd, setting, setting_len);
+    // 提取 salt
+    char salt[16] = {0};
+    getSaltByCryptPasswd(salt, cryptpasswd);
+    free(cryptpasswd);
 
-    printf("[INFO] loginCheck1 end\n");
-    */
+    // 发送 salt
+    int salt_len = strlen(salt);
+    sendn(task->fd, &salt_len, sizeof(int));
+    sendn(task->fd, salt, salt_len);
+
+    // 更新本地 user_table
+    // 如果用户没到 check2，会在 say goodbye 时处理
+    task->u_table[task->fd] = uid;
+
+    log_debug("loginCheck1 end");
+    return;
+}
+
+void loginCheck2(Task* task) {
+    log_debug("loginCheck2 start");
+
+    // args[1] = u_cryptpasswd
+    char* u_cryptpasswd = task->args[1];
+    int uid = task->u_table[task->fd];
+
+    // 查询数据库中的 cryptpasswd
+    MYSQL* pconn = getDBConnection(task->dbpool);
+    char* cryptpasswd = getCryptpasswdByUID(pconn, uid);
+    releaseDBConnection(task->dbpool, pconn);
+
+    int status_code = 0;
+    if (strcmp(u_cryptpasswd, cryptpasswd) == 0) {
+        // 登录成功
+        sendn(task->fd, &status_code, sizeof(int));
+        log_info("[uid=%d] login successfully", uid);
+    } else {
+        // 登录失败，密码错误
+        status_code = 1;
+        sendn(task->fd, &status_code, sizeof(int));
+        log_warn("[%d] login failed", uid);
+    }
+
+    log_debug("loginCheck2 end");
+    return;
+}
+
+void regCheck1(Task* task) {
+    log_debug("regCheck1 start");
+    log_info("user to register: [%s]", task->args[1]);
+
+    char* username = task->args[1];
+    // 查数据库，用户名是否可用
+    // 0: 用户名可用, 1: 用户名已存在
+    int status_code = 0;
+    MYSQL* pconn = getDBConnection(task->dbpool);
+    if (userExist(pconn, username)) {
+        releaseDBConnection(task->dbpool, pconn);
+        status_code = 1;
+        sendn(task->fd, &status_code, sizeof(int));
+        return;
+    }
+    releaseDBConnection(task->dbpool, pconn);
+
+    // 可以注册
+    sendn(task->fd, &status_code, sizeof(int));
+    // 生成 salt
+    char* salt = generateSalt();
+    // 发送 salt
+    int salt_len = strlen(salt);
+    sendn(task->fd, &salt_len, sizeof(int));
+    sendn(task->fd, salt, salt_len);
+    free(salt);
+
+    log_debug("regCheck1 end");
+
     return;
 }
 
 void regCheck2(Task* task) {
-    printf("[INFO] loginCheck2 start\n");
+    log_debug("regCheck2 start");
 
-    // printf("[INFO] user passwd: <%s>\n", task->args[1]);
+    // args[1] = username
+    // args[2] = cryptpasswd
 
-    int user_stat = 0;
-    WorkDir* wd = task->wd_table[task->fd];
+    char* username = task->args[1];
+    char* cryptpasswd = task->args[2];
 
-    if (strcmp(wd->encrypted, task->args[1]) == 0) {
-        // 登录成功
-        sendn(task->fd, &user_stat, sizeof(int));
-        log_info("[%s] login successfully", wd->name);
-    } else {
-        // 登录失败，密码错误
-        user_stat = 1;
-        sendn(task->fd, &user_stat, sizeof(int));
-        log_warn("[%s] login failed", wd->name);
+    MYSQL* pconn = getDBConnection(task->dbpool);
+
+    // 插入用户记录到 nb_usertable
+
+    long long pwdid = 0;
+    int uid = userInsert(pconn, username, cryptpasswd, pwdid);
+
+    // 插入用户目录记录到 nb_vftable
+    pwdid = insertRecord(pconn, -1, uid, NULL, "home", "/", 'd', NULL, NULL);
+    if (pwdid == -1) {
+        log_error("insertRecord failed");
+        exit(EXIT_FAILURE);
+    }
+    char pwdid_str[64] = {0};
+    sprintf(pwdid_str, "%lld", pwdid);
+
+    // 更新用户的 pwdid
+    int err = userUpdate(pconn, uid, "pwdid", pwdid_str);
+    if (err) {
+        log_error("userUpdate failed");
+        exit(EXIT_FAILURE);
     }
 
-    printf("[INFO] loginCheck2 end\n");
+
+    releaseDBConnection(task->dbpool, pconn);
+
+    // 0: 注册成功
+    int status_code = 0;
+    sendn(task->fd, &status_code, sizeof(int));
+    log_info("[%s] register successfully", username);
+
+    log_debug("regCheck2 end");
     return;
 }
 

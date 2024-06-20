@@ -17,11 +17,12 @@ void serverInit(ServerConfig* conf, HashTable* ht) {
 
 int g_exit_pipe[2];
 static void exitHandler(int signo) {
-    printf("[INFO] Exit order received.\n");
+    log_info("Exit order received.");
     write(g_exit_pipe[1], "1", 1);
 }
 
 int serverMain(ServerConfig* conf, HashTable* ht) {
+#if 0
     pipe(g_exit_pipe);
     pid_t pid = fork();
     switch (pid) {
@@ -31,7 +32,7 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
             break;
         default:
             // 父进程
-            printf("[INFO] %d MCV porcess reporting\n", getpid());
+            log_info("%d MCV porcess reporting", getpid());
             close(g_exit_pipe[0]);
             // 捕获 SIGUSR1 信号
             if (signal(SIGUSR1, exitHandler) == SIG_ERR) {
@@ -42,9 +43,9 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
             exit(0);
     }
     // 子进程
-    printf("[INFO] %d Kirov process reporting\n", getpid());
+    log_info("%d Kirov process reporting", getpid());
     close(g_exit_pipe[1]);
-
+#endif
     // epoll
     int epfd = epoll_create(1);
 
@@ -71,7 +72,7 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
     // 存储用户当前目录
     WorkDir* workdir_table[MAXEVENTS] = {0};
 
-    // 存储用户当前目录
+    // 存储 uid
     int user_table[MAXUSER] = {0};
 
     // 主循环
@@ -115,11 +116,11 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
 
 int serverExit(ThreadPool* pool) {
     // 父进程传来信号
-    printf("[INFO] All the comrades, exit!\n");
+    log_info("All the comrades, exit!");
 
     // 通知各个子线程退出
     for (int j = 0; j < pool->num_threads; j++) {
-        Task exit_task = {-1, -1, 0, NULL, NULL, NULL};
+        Task exit_task = {-1, 0, NULL, 0, NULL, NULL, NULL};
         blockqPush(pool->task_queue, &exit_task);
     }
     // 等待各个子线程退出
@@ -128,29 +129,33 @@ int serverExit(ThreadPool* pool) {
     }
 
     // 主线程退出
-    printf("[INFO] For home country, see you!\n");
+    log_info("For home country, see you!");
     pthread_exit(0);
 }
 
 void requestHandler(int connfd, ThreadPool* pool, int* user_table,
                     DBConnectionPool* dbpool, WorkDir** workdir_table) {
     // 接收、处理请求
-    // 先接长度
-    int req_len = -1;
-    int ret = recv(connfd, &req_len, sizeof(int), MSG_WAITALL);
+    // 先接总长度
+    int request_len = -1;
+    int ret = recv(connfd, &request_len, sizeof(int), MSG_WAITALL);
 
-    if (req_len > 0) {
+    if (request_len > 0) {
         // 再接内容
-        char req[MAXLINE] = {0};
-        ret = recv(connfd, req, req_len, MSG_WAITALL);
+        Command cmd = -1;
+        char data[MAXLINE] = {0};
+        int data_len = request_len - sizeof(cmd);
+        ret = recv(connfd, &cmd, sizeof(cmd), MSG_WAITALL);
+        ret = recv(connfd, data, data_len, MSG_WAITALL);
 
         if (ret > 0) {
             // 创建任务
             Task* task = (Task*)malloc(sizeof(Task));
             task->fd = connfd;
             task->uid = user_table[connfd];
-            task->args = getArgs(req);
-            task->cmd = getCommand(task->args[0]);
+            task->u_table = user_table;
+            task->args = getArgs(data);
+            task->cmd = cmd;
             task->dbpool = dbpool;
             task->wd_table = workdir_table;
 
@@ -160,7 +165,8 @@ void requestHandler(int connfd, ThreadPool* pool, int* user_table,
     }
 
     if (ret == 0) {
-        printf("[INFO] Say goodbye to connection %d\n", connfd);
+        log_info("Say goodbye to connection %d", connfd);
+        user_table[connfd] = 0;
         workdirFree(workdir_table[connfd]);
         close(connfd);
     } else if (ret < 0) {
