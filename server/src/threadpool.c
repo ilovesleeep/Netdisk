@@ -11,7 +11,7 @@ void* eventLoop(void* arg) {
 
         // 优雅退出
         if (task->fd == -1) {
-            printf("[INFO] %lu Da! Moving out!\n", tid);
+            log_debug("%lu Da! Moving out!\n", tid);
             pthread_exit(0);
         }
 
@@ -21,24 +21,22 @@ void* eventLoop(void* arg) {
         // epollMod(pool->epfd, task->fd, 0);
         // epollDel(pool->epfd, task->fd);
 
-        printf("[INFO] %lu Da! For mother China!\n", tid);
+        log_debug("%lu Da! For mother China!", tid);
 
         char buf[MAXLINE];
         bzero(buf, MAXLINE);
         int retval = taskHandler(task);
         taskFree(task);
 
-        printf("[INFO] %lu Ura! Waiting orders.\n", tid);
+        log_debug("%lu Ura! Waiting orders.\n", tid);
 
-        if(retval != 1){
+        if (retval != 1) {
             epollMod(pool->epfd, connfd, EPOLLIN | EPOLLONESHOT);
-        }
-        else{
+        } else {
             epollDel(pool->epfd, connfd);
             close(connfd);
         }
         // epollAdd(pool->epfd, connfd);
-
     }
 }
 
@@ -55,7 +53,7 @@ ThreadPool* createThreadPool(int n, int epfd) {
     // 创建线程
     for (int i = 0; i < n; i++) {
         pthread_create(&pool->threads[i], NULL, eventLoop, pool);
-        printf("[INFO] %lu Conscript reporting\n", pool->threads[i]);
+        log_debug("%lu Conscript reporting", pool->threads[i]);
     }
 
     return pool;
