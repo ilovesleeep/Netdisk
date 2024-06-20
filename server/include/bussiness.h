@@ -3,9 +3,11 @@
 
 #include <shadow.h>
 
+#include "auth.h"
 #include "dbpool.h"
 #include "head.h"
 #include "log.h"
+#include "mysqloperate.h"
 #include "parser.h"
 
 typedef struct {
@@ -18,6 +20,7 @@ typedef struct {
 typedef struct {
     int fd;
     int uid;
+    int* u_table;
     Command cmd;
     char** args;
     DBConnectionPool* dbpool;
