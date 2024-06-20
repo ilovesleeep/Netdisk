@@ -743,17 +743,20 @@ void loginCheck1(Task* task) {
 
     // 获取 uid
     int uid = getUserIDByUsername(pconn, username);
-    printf("get [%s] uid = %d\n", username, uid);
 
-    // 查询 salt
-    char* salt = getSaltByUID(pconn, uid);
+    // 查询 cryptpasswd
+    char* cryptpasswd = getCryptpasswdByUID(pconn, uid);
     releaseDBConnection(task->dbpool, pconn);
+
+    // 提取 salt
+    char salt[16] = {0};
+    getSaltByCryptPasswd(salt, cryptpasswd);
+    free(cryptpasswd);
 
     // 发送 salt
     int salt_len = strlen(salt);
     sendn(task->fd, &salt_len, sizeof(int));
     sendn(task->fd, salt, salt_len);
-    free(salt);
 
     // 更新本地 user_table
     // 如果用户没到 check2，会在 say goodbye 时处理
@@ -827,17 +830,15 @@ void regCheck2(Task* task) {
     log_debug("regCheck2 start");
 
     // args[1] = username
-    // args[2] = salt
-    // args[3] = cryptpasswd
+    // args[2] = cryptpasswd
 
     char* username = task->args[1];
-    char* salt = task->args[2];
-    char* cryptpasswd = task->args[3];
+    char* cryptpasswd = task->args[2];
 
     MYSQL* pconn = getDBConnection(task->dbpool);
     int pwdid = 0;
     // insertRecord(); 获取 pwdid
-    int uid = userInsert(pconn, username, salt, cryptpasswd, pwdid);
+    int uid = userInsert(pconn, username, cryptpasswd, pwdid);
     releaseDBConnection(task->dbpool, pconn);
 
     // 0: 注册成功

@@ -3,7 +3,7 @@
 #define STR_LEN 8
 
 char* generateSalt(void) {
-    int salt_len = 3 + STR_LEN;                // 3 for "$6$"
+    int salt_len = 4 + STR_LEN;                // 4 for "$6$...$"
     char* salt = (char*)malloc(salt_len + 1);  // +1 for '\0'
     if (salt == NULL) {
         log_error("Memory allocation failed");
@@ -27,51 +27,19 @@ char* generateSalt(void) {
                 break;
         }
     }
+    salt[salt_len - 1] = '$';
     salt[salt_len] = '\0';
 
     return salt;
 }
 
-// char* getSalt();
-
-char* getSaltByUID(MYSQL* pconn, int uid) {
-    char query[256];
-    snprintf(query, sizeof(query),
-             "SELECT salt FROM nb_usertable WHERE id = %d", uid);
-
-    int err = mysql_query(pconn, query);
-    if (err) {
-        error(1, 0, "[ERROR] mysql_query() failed: %s\n", mysql_error(pconn));
+void getSaltByCryptPasswd(char* salt, char* cryptpasswd) {
+    int i, j;
+    // 取出salt,i 记录密码字符下标，j记录$出现次数
+    for (i = 0, j = 0; cryptpasswd[i] && j != 3; ++i) {
+        if (cryptpasswd[i] == '$') ++j;
     }
-
-    MYSQL_RES* res = mysql_store_result(pconn);
-    if (res == NULL) {
-        error(1, 0, "[ERROR] mysql_store_result() failed: %s\n",
-              mysql_error(pconn));
-    }
-
-    MYSQL_ROW row;
-    char* result_salt = NULL;
-
-    if ((row = mysql_fetch_row(res))) {
-        unsigned long* lengths = mysql_fetch_lengths(res);
-        if (lengths == NULL) {
-            error(1, 0, "[ERROR] mysql_fetch_lengths() failed: %s\n",
-                  mysql_error(pconn));
-        }
-
-        result_salt = (char*)malloc(lengths[0] + 1);
-        if (result_salt == NULL) {
-            error(1, 0, "[ERROR] Memory allocation failed\n");
-        }
-
-        strncpy(result_salt, row[0], lengths[0]);
-        result_salt[lengths[0]] = '\0';  // 添加 null 终止符
-    }
-
-    mysql_free_result(res);
-
-    return result_salt;
+    strncpy(salt, cryptpasswd, i);
 }
 
 char* getCryptpasswdByUID(MYSQL* pconn, int uid) {
@@ -249,11 +217,11 @@ bool userExist(MYSQL* pconn, const char* username) {
     return exists > 0;
 }
 
-int userInsert(MYSQL* pconn, const char* username, const char* salt,
-               const char* cryptpasswd, int pwdid) {
+int userInsert(MYSQL* pconn, const char* username, const char* cryptpasswd,
+               int pwdid) {
     const char* query =
-        "INSERT INTO nb_usertable (username, salt, cryptpasswd, pwdid) VALUES "
-        "(?, ?, ?, ?)";
+        "INSERT INTO nb_usertable (username, cryptpasswd, pwdid) VALUES "
+        "(?, ?, ?)";
     MYSQL_STMT* stmt = mysql_stmt_init(pconn);
 
     if (stmt == NULL) {
@@ -265,7 +233,7 @@ int userInsert(MYSQL* pconn, const char* username, const char* salt,
                   mysql_stmt_error(stmt));
     }
 
-    MYSQL_BIND bind[4];
+    MYSQL_BIND bind[3];
     bzero(bind, sizeof(bind));
 
     // 绑定参数
@@ -275,19 +243,14 @@ int userInsert(MYSQL* pconn, const char* username, const char* salt,
     bind[0].buffer_length = strlen(username);
 
     bind[1].buffer_type = MYSQL_TYPE_VAR_STRING;
-    bind[1].buffer = (char*)salt;
+    bind[1].buffer = (char*)cryptpasswd;
     bind[1].is_null = 0;
-    bind[1].buffer_length = strlen(salt);
+    bind[1].buffer_length = strlen(cryptpasswd);
 
-    bind[2].buffer_type = MYSQL_TYPE_VAR_STRING;
-    bind[2].buffer = (char*)cryptpasswd;
+    bind[2].buffer_type = MYSQL_TYPE_LONG;
+    bind[2].buffer = &pwdid;
     bind[2].is_null = 0;
-    bind[2].buffer_length = strlen(cryptpasswd);
-
-    bind[3].buffer_type = MYSQL_TYPE_LONG;
-    bind[3].buffer = &pwdid;
-    bind[3].is_null = 0;
-    bind[3].length = NULL;
+    bind[2].length = NULL;
 
     if (mysql_stmt_bind_param(stmt, bind)) {
         error(1, 0, "[ERROR] mysql_stmt_bind_param() failed: %s\n",
@@ -299,7 +262,7 @@ int userInsert(MYSQL* pconn, const char* username, const char* salt,
               mysql_stmt_error(stmt));
     }
 
-    log_info("User '%s' inserted successfully.", username);
+    log_info("User [%s] inserted successfully.", username);
     mysql_stmt_close(stmt);
 
     int uid = mysql_insert_id(pconn);
