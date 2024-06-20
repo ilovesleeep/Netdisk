@@ -319,15 +319,17 @@ int userUpdate(MYSQL* pconn, int uid, const char* fieldname,
         log_error(mysql_error(pconn));
         return -1;
     }
-    // 提交事务
-    mysql_query(pconn, "COMMIT");
 
     // 检查是否成功更新
     if (mysql_affected_rows(pconn) == 0) {
+        // 出错，回滚事务
+        mysql_query(pconn, "ROLLBACK");
         log_warn("No rows updated when update uid[%d] at field[%s]", uid,
                  fieldname);
         return 1;
     }
+    // 提交事务
+    mysql_query(pconn, "COMMIT");
 
     return 0;
 }

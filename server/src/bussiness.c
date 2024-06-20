@@ -821,7 +821,7 @@ void regCheck2(Task* task) {
     MYSQL* pconn = getDBConnection(task->dbpool);
 
     // 插入用户记录到 nb_usertable
-    long long pwdid = 0;
+    long long pwdid = -1;
     int uid = userInsert(pconn, username, cryptpasswd, pwdid);
 
     // 插入用户目录记录到 nb_vftable
@@ -830,6 +830,7 @@ void regCheck2(Task* task) {
         log_error("insertRecord failed");
         exit(EXIT_FAILURE);
     }
+    printf("pwdid = %lld\n", pwdid);
     char pwdid_str[64] = {0};
     sprintf(pwdid_str, "%lld", pwdid);
 
