@@ -1,5 +1,8 @@
 #include "../include/dbpool.h"
 #include "../include/head.h"
+
+#define MAX_CHILD 2048
+
 //获取当前路径,传入连接和用户uid，传出当前目录的索引
 int getPwdId(MYSQL* mysql, int uid) {
     const char sql[60] = "select pwd from nb_usertable where id = ?";
@@ -42,7 +45,7 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* path) {
     if(strcmp(path, "..") == 0){
         //查找上一级目录
         char* sql[100] = {0};
-        sprintf("select id from ")
+        // sprintf("select id from ");
     }
     else if(strcmp(path, "~") == 0){
         //查找家目录
@@ -58,5 +61,13 @@ char* getPwd(MYSQL* mysql, int pwdid){
 }
 
 char** findchild(MYSQL*mysql, int pwdid){
+    char** result = (char**)calloc(MAX_CHILD, sizeof(char*));
+
     
+
+
+    
+
+
+
 }
