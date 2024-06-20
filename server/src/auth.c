@@ -49,6 +49,7 @@ char* getCryptpasswdByUID(MYSQL* pconn, int uid) {
 
     int err = mysql_query(pconn, query);
     if (err) {
+        log_error("[ERROR] mysql_query() failed: %s\n", mysql_error(pconn));
         error(1, 0, "[ERROR] mysql_query() failed: %s\n", mysql_error(pconn));
     }
 
@@ -267,4 +268,27 @@ int userInsert(MYSQL* pconn, const char* username, const char* cryptpasswd,
 
     int uid = mysql_insert_id(pconn);
     return uid;
+}
+
+int userUpdate(MYSQL* pconn, int uid, const char* fieldname,
+               const char* value) {
+    char query[256];
+    snprintf(query, sizeof(query),
+             "UPDATE nb_usertable SET %s = '%s' WHERE id = %d", fieldname,
+             value, uid);
+
+    int err = mysql_query(pconn, query);
+    if (err) {
+        log_error(mysql_error(pconn));
+        return -1;
+    }
+
+    // 检查是否成功更新
+    if (mysql_affected_rows(pconn) == 0) {
+        log_warn("No rows updated when update uid[%d] at field[%s]", uid,
+                 fieldname);
+        return 1;
+    }
+
+    return 0;
 }

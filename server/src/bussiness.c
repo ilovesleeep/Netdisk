@@ -6,7 +6,6 @@
 #include <stdlib.h>
 
 #include "../include/dbpool.h"
-
 #include "../include/mysqloperate.h"
 
 #define BUFSIZE 4096
@@ -559,7 +558,6 @@ void pwdCmd(Task* task) {
 }
 
 int getsCmd(Task* task) {
-    
     // 确认参数数量是否正确
     if (task->args[1] == NULL) {
         int send_stat = 1;
@@ -574,11 +572,9 @@ int getsCmd(Task* task) {
         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
     }
 
-
-
-    //获取一个mysql连接
+    // 获取一个mysql连接
     MYSQL* mysql = getDBConnection(task->dbpool);
-    //获取当前路径
+    // 获取当前路径
     int pwdid = getPwdId(mysql, task->uid);
 
     // 发送文件
@@ -589,27 +585,29 @@ int getsCmd(Task* task) {
 
         char file_name[128] = {0};
         int target_pwdid = pwdid;
-        for(char* p = parameter[i]; *p; p++){
-            for(char* start = p; *p != '/' && *p != '\0'; p++){
-                if(*(p + 1) == '/'){
+        for (char* p = parameter[i]; *p; p++) {
+            for (char* start = p; *p != '/' && *p != '\0'; p++) {
+                if (*(p + 1) == '/') {
                     bzero(file_name, sizeof(file_name));
                     strncpy(file_name, start, p - start + 1);
-                    target_pwdid = goToRelativeDir(mysql, target_pwdid, file_name);
-                    if(target_pwdid == -1){
-                        //路径错误
+                    target_pwdid =
+                        goToRelativeDir(mysql, target_pwdid, file_name);
+                    if (target_pwdid == -1) {
+                        // 路径错误
                         //***消息对接***
                         return 0;
                     }
                     break;
                 }
-                if(*(p + 1) == '\0'){
+                if (*(p + 1) == '\0') {
                     strcpy(file_name, start);
                     break;
                 }
             }
         }
-        //此时file_name即文件名
+        // 此时file_name即文件名
 
+        char* path_file = NULL;
         int fd = open(path_file, O_RDWR);
         // 检查文件是否存在
         // 不存在
@@ -863,9 +861,26 @@ void regCheck2(Task* task) {
     char* cryptpasswd = task->args[2];
 
     MYSQL* pconn = getDBConnection(task->dbpool);
-    int pwdid = 0;
-    // insertRecord(); 获取 pwdid
-    int uid = userInsert(pconn, username, cryptpasswd, pwdid);
+
+    // 插入用户记录到 nb_usertable
+    int uid = userInsert(pconn, username, cryptpasswd, 0);
+
+    // 插入用户目录记录到 nb_vftable
+    int err = insertRecord(pconn, -1, uid, NULL, "home", "/", 'd', NULL, NULL);
+    if (err == -1) {
+        log_error("insertRecord failed");
+        exit(EXIT_FAILURE);
+    }
+    char pwdid_str[64] = {0};
+    sprintf(pwdid_str, "%lld", mysql_insert_id(pconn));
+
+    // 更新用户的 pwdid
+    err = userUpdate(pconn, uid, "pwdid", pwdid_str);
+    if (err) {
+        log_error("usreUpdate failed");
+        exit(EXIT_FAILURE);
+    }
+
     releaseDBConnection(task->dbpool, pconn);
 
     // 0: 注册成功

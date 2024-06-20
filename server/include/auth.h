@@ -14,5 +14,6 @@ bool userExist(MYSQL* pconn, const char* username);
 bool userPass(MYSQL* pconn, int uid, const char* cryptpasswd);
 int userInsert(MYSQL* pconn, const char* username, const char* cryptpasswd,
                int pwdid);
+int userUpdate(MYSQL* pconn, int uid, const char* fieldname, const char* value);
 
 #endif
