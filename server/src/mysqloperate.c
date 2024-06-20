@@ -59,7 +59,7 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* path) {
     }
     else{
         //查找指定目录项
-        char sql[] = "select id, type from nb_vftable where p_id = ? and name = ?";
+        char sql[] = "select id, type from nb_vftable where p_id = ? and name = ? and exist = 1";
         //初始化stmt语句
         MYSQL_STMT* stmt = mysql_stmt_init(mysql);
         int ret = mysql_stmt_prepare(stmt, sql, strlen(sql));
