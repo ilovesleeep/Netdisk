@@ -7,6 +7,8 @@
 
 #include "../include/dbpool.h"
 
+#include "../include/mysqloperate.h"
+
 #define BUFSIZE 4096
 #define MAXLINE 1024
 #define BIGFILE_SIZE (100 * 1024 * 1024)
@@ -557,11 +559,7 @@ void pwdCmd(Task* task) {
 }
 
 int getsCmd(Task* task) {
-    // 获取当前路径
-    char path[1000] = {0};
-    WorkDir* pathbase = task->wd_table[task->fd];
-    strncpy(path, pathbase->path, pathbase->index[pathbase->index[0]] + 1);
-
+    
     // 确认参数数量是否正确
     if (task->args[1] == NULL) {
         int send_stat = 1;
@@ -575,6 +573,14 @@ int getsCmd(Task* task) {
         int send_stat = 0;
         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
     }
+
+
+
+    //获取一个mysql连接
+    MYSQL* mysql = getDBConnection(task->dbpool);
+    
+    int pwd = getpwd(mysql, task->uid);
+
     // 发送文件
     char** parameter = task->args;
     while (*(++parameter)) {
