@@ -7,4 +7,4 @@ int getPwdId(MYSQL* mysql, int uid);
 char* getPwd(MYSQL* mysql, int pwdid);
 int goToRelativeDir(MYSQL* mysql, int pwd, char* path);
 char** findchild(MYSQL*mysql, int pwdid);
-#endif;
+#endif
