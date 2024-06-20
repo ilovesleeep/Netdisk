@@ -8,7 +8,7 @@ int getpwd(MYSQL* mysql, int uid){
     //初始化参数
     MYSQL_BIND bind;
     bzero(&bind, sizeof(bind));
-    bind.buffer_type = MYSQL_TYPE_LONG;
+    bind.buffer_type = MYSQL_TYPE_LONG; 
     bind.buffer = &uid;
     bind.length = NULL;
     bind.is_null = 0;
