@@ -169,17 +169,13 @@ int insertRecord(MYSQL* mysql, int p_id, int u_id, char* f_hash, char* name,
     bind.is_null = 0;
 
     ret = mysql_stmt_bind_param(stmt, &bind);
-    log_debug("ret = %d");
 
     // 执行语句前先开启事务
-    // ret = mysql_query(mysql, "START TRANSACTION");
-    log_debug("ret = %d");
+    ret = mysql_query(mysql, "START TRANSACTION");
     ret = mysql_stmt_execute(stmt);
-    log_debug("ret = %d");
 
     int retval = mysql_insert_id(mysql);
-    // ret = mysql_query(mysql, "COMMIT");
-    log_debug("ret = %d");
+    ret = mysql_query(mysql, "COMMIT");
 
     mysql_stmt_close(stmt);
 
