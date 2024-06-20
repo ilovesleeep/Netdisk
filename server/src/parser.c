@@ -41,7 +41,7 @@ char** getArgs(const char* req) {
         int token_len = strlen(token);
         args[i] = (char*)calloc((token_len + 1), sizeof(char));  // +1 for '\0'
         if (args[i] == NULL) {
-            while (i >= 0) {
+            while (i > 0) {
                 free(args[--i]);
             }
             free(args);

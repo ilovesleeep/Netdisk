@@ -2,10 +2,10 @@
 #include "../include/head.h"
 
 
-#define MAX_CHILD 2048
+#define MAX_CHILD_CHARACTER 512
 
 
-int getPwdId(MYSQL *mysql,int uid){
+int getPwdId(MYSQL* mysql,int uid){
     int pwdid;
     char sql[60] = {};
     sprintf("select pwdid from nb_usertable where id=%d",uid);
@@ -105,9 +105,49 @@ char* getPwd(MYSQL* mysql, int pwdid){
 
 }
 
-char** findchild(MYSQL*mysql, int pwdid){
+char** findchild(MYSQL* mysql, int pwdid){
+    int idx = 0;
+    char** family = (char**)calloc(MAX_CHILD_CHARACTER * 4, sizeof(char*));
+    if (family == NULL) {
+        log_error("malloc: %s", strerror(errno));
+        error(1, errno, "malloc");
+    }
 
+    const char* qurey_str = "select name from nb_vftable where p_id = ";
+    char str[16] = {0};
+    sprintf(str, "%d", pwdid);
+    char query[1024] = {0};
+    sprintf(query,"%s%s", qurey_str, str);
 
+    int ret = mysql_query(mysql, query);
+    if (ret != 0) {
+        log_error("mysql_query: %s", strerror(errno));
+        error(1, errno, "findchild: mysql_query");  
+    } 
+
+    MYSQL_RES* result = mysql_store_result(mysql);
+    if (result) {
+        MYSQL_ROW row;
+        while ((row = mysql_fetch_row(result)) != NULL) {
+            family[idx] = (char*)calloc(MAX_CHILD_CHARACTER * 2, sizeof(char));
+            if (family[idx] == NULL) {
+                while (idx > 0) {
+                    free(family[--idx]);
+                }
+                free(family);
+                mysql_free_result(result);
+                log_error("findchild malloc: %s", strerror(errno));
+                error(1, errno, "findchild malloc");
+            }
+            strcpy(family[idx], *row);
+            //printf("%s\n", *row);
+            row++;
+            idx++;
+        }
+    }
+    family[idx] = NULL;
+    mysql_free_result(result);
+    return family;
 }
 
 //填入需要插入的值,函数会将值插入MYSQL,返回插入的主键id值,若插入失败则返回-1
