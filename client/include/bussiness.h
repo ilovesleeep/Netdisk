@@ -5,8 +5,15 @@
 #include "parser.h"
 
 typedef struct {
-    int fd;
-    char** args;
+    Command cmd;
+    char* token;
+    char* host;
+    char* port;
+
+    // TODO: 方案1：分片+合并
+    // char* file;        // 文件名
+    // int splice_start;  // 文件切片起始位置
+    // int splice_size;   // 文件切片大小
 } Task;
 
 int sendn(int sockfd, void* buf, int length);

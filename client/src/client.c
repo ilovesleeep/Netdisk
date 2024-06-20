@@ -3,6 +3,8 @@
 #define MAXLINE 1024
 #define BUFSIZE 1024
 #define MAX_NAME_LENGTH 20
+#define NUM_THREADS 4
+#define MAXEVENTS 1024
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
@@ -59,10 +61,6 @@ void welcome(int sockfd, char* username) {
                 printMenu();
                 option = -1;
                 break;
-            // printf(
-            //    "Registration requires v50 to us, please contact
-            //    admin\n");
-            // exit(EXIT_SUCCESS);
             case 3:
                 printf("See you\n");
                 exit(EXIT_SUCCESS);
@@ -169,58 +167,161 @@ void printMenu(void) {
         "\033[0m"
         "                                        \n");
 }
-/*
+
 int mainTest(int argc, char* argv[]) {
+    if (argc != 3) {
+        error(1, 0, "Usage: %s [host] [port]\n", argv[0]);
+    }
+
+    // 连接主服务器(调度)
+    int sockfd = tcpConnect(argv[1], argv[2]);
+
+    // 欢迎用户
+    printMenu();
+    char user[MAX_NAME_LENGTH + 1] = {0};
+    welcome(sockfd, user);
+
+    // 创建 epoll
     int epfd = epoll_create(1);
 
-    epollAdd(epfd, g_exit_pipe[0]);
-
-    // 创建线程池
-    ThreadPool* pool = createThreadPool(conf->num_threads, epfd);
-
-    // 连接主服务器（路由）
-    int sockfd = tcpConnect(argv[1], argv[2]);
+    // 将 sockfd 加入 epoll
     epollAdd(epfd, sockfd);
 
+    // 创建线程池
+    ThreadPool* pool = createThreadPool(NUM_THREADS, epfd);
+
+    // 就绪事件
     struct epoll_event* ready_events =
         (struct epoll_event*)calloc(MAXEVENTS, sizeof(struct epoll_event));
+
+    // 打印提示符
+    char cwd[MAXLINE] = "~";
+    printf("\033[32m[%s@%s]:\033[33m%s\033[0m$ ", user, argv[1], cwd);
+    fflush(stdout);
 
     // 主循环
     while (1) {
         int nready = epoll_wait(epfd, ready_events, MAXEVENTS, -1);
 
         for (int i = 0; i < nready; i++) {
-            if (ready_events[i].data.fd == sockfd) {
-                // 路由服务器发来信息
-                struct sockaddr_storage client_addr;
-                socklen_t addrlen = sizeof(client_addr);
+            if (ready_events[i].data.fd == STDIN_FILENO) {
+                // 读入请求
+                char buf[BUFSIZE] = {0};
+                int buf_len = read(STDIN_FILENO, buf, BUFSIZE);
+                buf[--buf_len] = '\0';  // -1 for '\n'
 
-                int connfd =
-                    accept(listenfd, (struct sockaddr*)&client_addr, &addrlen);
+                // 解析请求
+                char** args = parseRequest(buf);
+                Command cmd = getCommand(args[0]);
+                if (cmd == CMD_UNKNOWN) {
+                    // 不响应
+                    argsFree(args);
+                    continue;
+                } else if (cmd == CMD_EXIT) {
+                    // 执行退出逻辑
+                    argsFree(args);
+                    close(sockfd);
+                    exit(EXIT_SUCCESS);
+                }
 
-                // 添加到 epoll
-                epollAdd(epfd, connfd);
-                epollMod(epfd, connfd, EPOLLIN | EPOLLONESHOT);
+                // 给调度服务器发请求
+                // 先发长度
+                int data_len = sizeof(cmd) + buf_len;
+                sendn(sockfd, &data_len, sizeof(int));
+                // 再发内容
+                sendn(sockfd, &cmd, sizeof(cmd));
+                sendn(sockfd, buf, buf_len);
 
-                // 初始化 workdir
-                char user_dir[] = "user";
-                workdirInit(workdir_table, connfd, user_dir);
+                argsFree(args);
 
-            } else if (ready_events[i].data.fd == g_exit_pipe[0]) {
-                // 父进程传来退出信号
-                pthread_cancel(monitor_dbpool);
-                pthread_join(monitor_dbpool, NULL);
-                destroyDBPool(dbpool);
-                serverExit(pool);
+            } else if (ready_events[i].data.fd == sockfd) {
+                // 处理调度服务器响应
+                // responseHandler(sockfd, pool);
+                // shortResponseHandler(sockfd);
 
             } else {
-                // 客户端发过来请求
-                requestHandler(ready_events[i].data.fd, pool, user_table,
-                               dbpool, workdir_table);
+                // 收到其他资源服务器的响应数据
             }
         }
     }
 
     return 0;
 }
-*/
+
+char** getNewConnectionInfo(char* res_data) { return parseRequest(res_data); }
+
+Task* getNewConnectionTask(Command cmd, char* res_data) {
+    // 响应内容中包含了：令牌 token, 资源服务器 host，端口 port 等其他信息
+    // 解析响应内容，获取新的连接需要的信息，创建新连接(长命令)任务
+
+    // info[0] token, info[1]: host, info[2]: port
+    char** info = getNewConnectionInfo(res_data);
+    //
+    Task* task = (Task*)malloc(sizeof(Task));
+    task->cmd = cmd;
+    task->token = info[0];
+    task->host = info[1];
+    task->port = info[2];
+
+    return task;
+}
+
+int responseHandler(int sockfd, ThreadPool* pool) {
+    // 接收响应长度
+    int res_len = -1;
+    int ret = recv(sockfd, &res_len, sizeof(int), MSG_WAITALL);
+
+    if (res_len > 0) {  // 接收到了有效长度
+        // 接收响应内容
+        Command cmd = -1;
+        char res_data[MAXLINE] = {0};
+        int data_len = res_len - sizeof(cmd);
+        ret = recv(sockfd, &cmd, sizeof(cmd), MSG_WAITALL);
+        ret = recv(sockfd, res_data, data_len, MSG_WAITALL);
+
+        if (ret > 0) {  // 接收到了有效响应
+            /*
+            if (cmd == CMD_PUTS || cmd == CMD_GETS) {
+                // 响应内容中包含了新的端口号等其他信息（资源服务器地址）
+                // 解析响应内容，获取新的连接需要的信息，创建新连接(长命令)任务
+                Task* task = getNewConnectionTask(res_data);
+                blockqPush(pool->task_queue, task);
+                return 0;
+            }
+            */
+            // 分离长短命令, 主线程处理短命令响应
+            Task* task = NULL;  // 避免警告，在标签外声明 task
+            switch (cmd) {
+                case CMD_PUTS:
+                case CMD_GETS:
+                    task = getNewConnectionTask(cmd, res_data);
+                    blockqPush(pool->task_queue, task);
+                    break;
+                case CMD_CD:
+                    return 0;
+                case CMD_LS:
+                    return 0;
+                case CMD_RM:
+                    return 0;
+                case CMD_PWD:
+                    return 0;
+                case CMD_MKDIR:
+                    return 0;
+                default:
+                    return 0;
+            }
+            // 只有长命令才能走到这里
+            blockqPush(pool->task_queue, task);
+        }
+    }
+
+    if (ret == 0) {
+        // 与服务器断开连接
+        log_info("Say goodbye to [Main Server]");
+        close(sockfd);
+    } else if (ret < 0) {
+        // 发生错误
+        log_error("recv: %", strerror(errno));
+    }
+    return 0;
+}

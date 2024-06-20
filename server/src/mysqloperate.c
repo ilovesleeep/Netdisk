@@ -161,20 +161,24 @@ int insertRecord(MYSQL* mysql, int p_id, int u_id, char* f_hash, char* name,
         return -1;
     }
 
+    unsigned long name_len = strlen(name);
+
     MYSQL_BIND bind;
     bzero(&bind, sizeof(bind));
-    bind.buffer_type = MYSQL_TYPE_VARCHAR;
+    bind.buffer_type = MYSQL_TYPE_VAR_STRING;
     bind.buffer = name;
-    bind.buffer_length = strlen(name);
+    bind.length = &name_len;
     bind.is_null = 0;
 
     ret = mysql_stmt_bind_param(stmt, &bind);
 
     // 执行语句前先开启事务
     ret = mysql_query(mysql, "START TRANSACTION");
+
     ret = mysql_stmt_execute(stmt);
 
     int retval = mysql_insert_id(mysql);
+
     ret = mysql_query(mysql, "COMMIT");
 
     mysql_stmt_close(stmt);
