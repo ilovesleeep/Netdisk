@@ -542,32 +542,59 @@ int getsCmd(Task* task) {
 
     // 发送文件
     char** parameter = task->args;
-    while (*(++parameter)) {
-        static int i = 0;  // 第一个文件
-        i++;
+    for(int i = 1; parameter[i]; i++){
         char file_name[512] = {0};
-        for (char* p = parameter; *p; p++) {
-            int target_pwdid = pwdid;
-            for (char* start = p; *p != '\0' && *p != '/'; p++) {
-                if (*(p + 1) == '/') {
+        int target_pwdid = pwdid;
+        for(char* p = parameter[i]; *p != '\0'; p++){
+            for(char* start = p; *p != '\0' && *p != '/'; p++){
+                if(*(p + 1) == '/'){
                     bzero(file_name, sizeof(file_name));
                     strncpy(file_name, start, p - start + 1);
-                    // user2 change here, add 4th parameter as NULL
-                    target_pwdid =
-                        goToRelativeDir(mysql, target_pwdid, file_name, NULL);
+                    target_pwdid = goToRelativeDir(mysql, target_pwdid, file_name, NULL);
                     if (target_pwdid == -1) {
                         // 路径错误
                         //***消息对接***
+                        int send_stat = 1;
+                        sendn(task->fd, &send_stat, sizeof(int));
+                        char send_info = "path not exist";
+                        int info_len = strlen(send_info);
+                        sendn(task->fd, &info_len, sizeof(int));
+                        sendn(task->fd, send_info, info_len);
+                        //资源释放
+                        releaseDBConnection(task->dbpool, mysql);
                         return 0;
                     }
-                } else if (*(p + 1) == '\0') {
-                    // 此时start是文件名,
+                }
+                else if(*(p + 1) == '\0'){
+                    //此时start是文件名,target_pwdid为待插入项的父目录id
+                    char type;
+                    target_pwdid = goToRelativeDir(mysql, target_pwdid, file_name, &type);
+                    if(type == 'D'){
+                        //最后文件名对应的是一个路径,本网盘暂不支持传输文件夹功能
+                        //***消息对接***
+                        int send_stat = 1;
+                        sendn(task->fd, &send_stat, sizeof(int));
+                        char send_info = "Don't support transmiting directory";
+                        int info_len = strlen(send_info);
+                        sendn(task->fd, &info_len, sizeof(int));
+                        sendn(task->fd, send_info, info_len);
+                        //资源释放
+                        releaseDBConnection(task->dbpool, mysql);
+                        return 0;
+                    }
                     strcpy(file_name, start);
                     break;
                 }
             }
         }
-        // 此时file_name即文件名
+        //此时file_name即文件名,target_pwdid为待插入项的id
+        //检查文件是否完整(不用检查了,我只会将完整的文件目录项设为1)
+        
+
+
+
+
+
 
         char* path_file = NULL;
         int fd = open(path_file, O_RDWR);
