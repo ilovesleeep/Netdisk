@@ -320,7 +320,7 @@ int userUpdate(MYSQL* pconn, int uid, const char* fieldname,
         return -1;
     }
     // 提交事务
-    mysql_query(pconn, "COMMIT");
+
 
     // 检查是否成功更新
     if (mysql_affected_rows(pconn) == 0) {
@@ -328,6 +328,7 @@ int userUpdate(MYSQL* pconn, int uid, const char* fieldname,
                  fieldname);
         return 1;
     }
+        mysql_query(pconn, "COMMIT");
 
     return 0;
 }

@@ -154,21 +154,20 @@ char** findchild(MYSQL* mysql, int pwdid, char type){
 
 // 填入需要插入的值,函数会将值插入MYSQL,返回插入的主键id值,若插入失败则返回-1
 int insertRecord(MYSQL* mysql, int p_id, int u_id, char* f_hash, char* name,
-                 char* path, char type, off_t* f_size, off_t* c_size) {
-
+                 char* path, char type, off_t* f_size, off_t* c_size, char exist) {
     char sql[1024] = {0};
     if (f_hash == NULL) {
         // 文件没有哈希值,因此是目录
         sprintf(sql,
-                "INSERT INTO nb_vftable(p_id, u_id, name, path, type) "
-                "VALUES(%d, %d, ?, '%s', '%c')",
-                p_id, u_id, path, type);
+                "INSERT INTO nb_vftable(p_id, u_id, name, path, type, exist) "
+                "VALUES(%d, %d, ?, '%s', '%c', '%c')",
+                p_id, u_id, path, type, exist);
     } else {
         // 有哈希值,一定是插入文件
         sprintf(sql,
                 "INSERT INTO nb_vftable(p_id, u_id, f_hash, name, path, type, "
-                "f_size, c_size) VALUES(%d, %d, %s, ?, %s, %c, %ld, %ld)",
-                p_id, u_id, f_hash, path, type, *f_size, *c_size);
+                "f_size, c_size) VALUES(%d, %d, '%s', ?, '%s', '%c', %ld, %ld, '%c')",
+                p_id, u_id, f_hash, path, type, *f_size, *c_size, exist);
     }
 
     MYSQL_STMT* stmt = mysql_stmt_init(mysql);
@@ -181,19 +180,20 @@ int insertRecord(MYSQL* mysql, int p_id, int u_id, char* f_hash, char* name,
 
     MYSQL_BIND bind;
     bzero(&bind, sizeof(bind));
-    bind.buffer_type = MYSQL_TYPE_VARCHAR;
+    bind.buffer_type = MYSQL_TYPE_VAR_STRING;
     bind.buffer = name;
-    bind.buffer_length = strlen(name);
+    unsigned long buf_len = strlen(name);
+    bind.length = &buf_len;
     bind.is_null = 0;
 
-    mysql_stmt_bind_param(stmt, &bind);
+    ret = mysql_stmt_bind_param(stmt, &bind);
 
     // 执行语句前先开启事务
-    mysql_query(mysql, "START TRANSACTION");
-    mysql_stmt_execute(stmt);
+    ret = mysql_query(mysql, "START TRANSACTION");
+    ret = mysql_stmt_execute(stmt);
 
     int retval = mysql_insert_id(mysql);
-    mysql_query(mysql, "COMMIT");
+    ret = mysql_query(mysql, "COMMIT");
 
     mysql_stmt_close(stmt);
 
