@@ -1,5 +1,5 @@
-#ifndef __NB_HASH_TABLE_H__
-#define __NB_HASH_TABLE_H__
+#ifndef __NB_HASH_TABLE_H
+#define __NB_HASH_TABLE_H
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
