@@ -665,13 +665,31 @@ int putsCmd(Task* task) {
 }
 
 void mkdirCmd(Task* task) {
-    if (task->args[1] == NULL) {  // missing operand
+
+    if (task->args[0] == NULL || task->args[1] != NULL) {  // missing operand
         char errmsg[MAXLINE] = "mkdir: missing operand";
+        int res_len = strlen(errmsg);
+
         send(task->fd, errmsg, strlen(errmsg), 0);
         log_error("mkdirCmd: missing operand");
         error(0, errno, "%d mkdir:", task->fd);
         return;
     }
+    int pwdid = 0;
+    char* mkdir_path = task->args[0];
+    
+    // MAX_PATH_LENGTH = 2048
+    char absolute_path[2048] = {0};
+    if (mkdir_path[0] == '/') { 
+        // 返回错误信息
+        // TODO:
+
+    } else if (mkdir_path[0] = '~') {
+        // mkdir 绝对路径
+        strcpy(absolute_path, mkdir_path);
+
+        MYSQL* mysql = getDBConnection(task->dbpool);
+        pwdid = goToRelativeDir(mysql, getPwdId(mysql, task->uid), "~", NULL);
 
 
 
@@ -679,61 +697,99 @@ void mkdirCmd(Task* task) {
 
 
 
-    // if (sizeof(task ->args[1]) >= 1000) {
-    //     error(1, 0, "mkdir_dirlen too long!");
+
+    
+    } else {  
+        // mkdir 相对路径
+
+
+    }
+
+    // char filename[512] = {0};
+    //     for (char* p = absolute_path; *p != '\0'; ++p) {
+    //         for (char* start = p; *p != '\0' && *p != '/'; ++p) {
+    //             if (*(p + 1) == '/') {
+    //                 bzero(filename, sizeof(filename));
+    //                 strncpy(filename, start, p - start - 1);
+
+
+
+
+
+
+
+
+
+    //             }
+    //         }
+    //     }
+
+
+
+
+
+
+
+
+
+
+
+
+    // // if (sizeof(task ->args[1]) >= 1000) {
+    // //     error(1, 0, "mkdir_dirlen too long!");
+    // // }
+
+    // // 找到当前目录
+    // // bug: 如果在极端情况下，path有1k长度，mkdir_dirlen也有1k长度，会溢出
+    // char curr_path[MAXLINE] = {0};
+    // WorkDir* wd = task->wd_table[task->fd];
+    // strncpy(curr_path, wd->path, strlen(wd->path));
+
+    // int index = wd->index[wd->index[0]];
+    // curr_path[index + 1] = '\0';
+
+    // // 将当前目录和args[1]拼接在一起
+    // char dir[2 * MAXLINE] = {0};
+    // sprintf(dir, "%s/%s", curr_path, task->args[1]);
+
+    // // debug
+    // // printf("wd->index[1] = %d, wd->index[0] = %d\n", wd->index[wd->index[0]],
+    // // wd->index[0]); printf("wdpath = %s\n", wd->path); printf("curpath =
+    // // %s\n", curr_path); printf("dir = %s\n",dir);
+
+    // // 根据dir递归创建目录
+    // // 找每个'/',将其替换成'\0'
+    // for (char* p = dir + 1; *p; ++p) {
+    //     if (*p == '/') {
+    //         // 这里没有跳过多余的'/'，但没有出bug，大概率是mkdir背后做了这个事情
+    //         *p = '\0';
+
+    //         if (mkdir(dir, 0777) && errno != EEXIST) {
+    //             char errmsg[MAXLINE] = "mkdir";
+    //             strncat(errmsg, strerror(errno),
+    //                     sizeof(errmsg) - strlen(strerror(errno)) - 1);
+    //             send(task->fd, errmsg, strlen(errmsg), 0);
+    //             // 后面补日志
+    //             error(0, errno, "%d mkdir:", task->fd);
+    //             return;
+    //         }
+
+    //         *p = '/';
+    //     }
     // }
 
-    // 找到当前目录
-    // bug: 如果在极端情况下，path有1k长度，mkdir_dirlen也有1k长度，会溢出
-    char curr_path[MAXLINE] = {0};
-    WorkDir* wd = task->wd_table[task->fd];
-    strncpy(curr_path, wd->path, strlen(wd->path));
+    // if (mkdir(dir, 0777) && errno != EEXIST) {
+    //     char errmsg[MAXLINE] = "mkdir";
+    //     strncat(errmsg, strerror(errno),
+    //             sizeof(errmsg) - strlen(strerror(errno)) - 1);
+    //     send(task->fd, errmsg, strlen(errmsg), 0);
+    //     // 后面补日志
+    //     error(0, errno, "%d mkdir:", task->fd);
+    //     return;
+    // }
 
-    int index = wd->index[wd->index[0]];
-    curr_path[index + 1] = '\0';
-
-    // 将当前目录和args[1]拼接在一起
-    char dir[2 * MAXLINE] = {0};
-    sprintf(dir, "%s/%s", curr_path, task->args[1]);
-
-    // debug
-    // printf("wd->index[1] = %d, wd->index[0] = %d\n", wd->index[wd->index[0]],
-    // wd->index[0]); printf("wdpath = %s\n", wd->path); printf("curpath =
-    // %s\n", curr_path); printf("dir = %s\n",dir);
-
-    // 根据dir递归创建目录
-    // 找每个'/',将其替换成'\0'
-    for (char* p = dir + 1; *p; ++p) {
-        if (*p == '/') {
-            // 这里没有跳过多余的'/'，但没有出bug，大概率是mkdir背后做了这个事情
-            *p = '\0';
-
-            if (mkdir(dir, 0777) && errno != EEXIST) {
-                char errmsg[MAXLINE] = "mkdir";
-                strncat(errmsg, strerror(errno),
-                        sizeof(errmsg) - strlen(strerror(errno)) - 1);
-                send(task->fd, errmsg, strlen(errmsg), 0);
-                // 后面补日志
-                error(0, errno, "%d mkdir:", task->fd);
-                return;
-            }
-
-            *p = '/';
-        }
-    }
-
-    if (mkdir(dir, 0777) && errno != EEXIST) {
-        char errmsg[MAXLINE] = "mkdir";
-        strncat(errmsg, strerror(errno),
-                sizeof(errmsg) - strlen(strerror(errno)) - 1);
-        send(task->fd, errmsg, strlen(errmsg), 0);
-        // 后面补日志
-        error(0, errno, "%d mkdir:", task->fd);
-        return;
-    }
-
-    // 成功了给客户端发一个0
-    send(task->fd, "0", sizeof("0"), 0);
+    // // 成功了给客户端发一个0
+    // send(task->fd, "0", sizeof("0"), 0);
 
     return;
 }
