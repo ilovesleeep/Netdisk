@@ -863,21 +863,22 @@ void regCheck2(Task* task) {
     MYSQL* pconn = getDBConnection(task->dbpool);
 
     // 插入用户记录到 nb_usertable
-    int uid = userInsert(pconn, username, cryptpasswd, 0);
+    long long pwdid = 0;
+    int uid = userInsert(pconn, username, cryptpasswd, pwdid);
 
     // 插入用户目录记录到 nb_vftable
-    int err = insertRecord(pconn, -1, uid, NULL, "home", "/", 'd', NULL, NULL);
-    if (err == -1) {
+    pwdid = insertRecord(pconn, -1, uid, NULL, "home", "/", 'd', NULL, NULL);
+    if (pwdid == -1) {
         log_error("insertRecord failed");
         exit(EXIT_FAILURE);
     }
     char pwdid_str[64] = {0};
-    sprintf(pwdid_str, "%lld", mysql_insert_id(pconn));
+    sprintf(pwdid_str, "%lld", pwdid);
 
     // 更新用户的 pwdid
-    err = userUpdate(pconn, uid, "pwdid", pwdid_str);
+    int err = userUpdate(pconn, uid, "pwdid", pwdid_str);
     if (err) {
-        log_error("usreUpdate failed");
+        log_error("userUpdate failed");
         exit(EXIT_FAILURE);
     }
 

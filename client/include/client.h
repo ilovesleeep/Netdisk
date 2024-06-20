@@ -16,5 +16,6 @@ void printMenu(void);
 void welcome(int sockfd, char* username);
 
 int sessionHandler(int sockfd, char* host, char* user);
+// void* sessionHandler(void* arg);
 
 #endif
