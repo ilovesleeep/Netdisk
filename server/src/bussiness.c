@@ -439,6 +439,7 @@ void lsCmd(Task* task) {
         strncat(result, "\t", sizeof(result) - strlen("\t"));
         family++;
     }
+    free(family);
     
     // 发送（大火车）
     int info_len = strlen(result);
@@ -678,10 +679,16 @@ void mkdirCmd(Task* task) {
     if (task->args[1] == NULL) {  // missing operand
         char errmsg[MAXLINE] = "mkdir: missing operand";
         send(task->fd, errmsg, strlen(errmsg), 0);
-        // 后面补日志
+        log_error("mkdirCmd: missing operand");
         error(0, errno, "%d mkdir:", task->fd);
         return;
     }
+
+
+
+
+
+
 
     // if (sizeof(task ->args[1]) >= 1000) {
     //     error(1, 0, "mkdir_dirlen too long!");
@@ -862,23 +869,23 @@ void regCheck2(Task* task) {
     MYSQL* pconn = getDBConnection(task->dbpool);
 
     // 插入用户记录到 nb_usertable
-    int uid = userInsert(pconn, username, cryptpasswd, 0);
+    int uid = userInsert(pconn, username, cryptpasswd, 1);
 
     // 插入用户目录记录到 nb_vftable
-    int err = insertRecord(pconn, -1, uid, NULL, "home", "/", 'd', NULL, NULL);
-    if (err == -1) {
-        log_error("insertRecord failed");
-        exit(EXIT_FAILURE);
-    }
-    char pwdid_str[64] = {0};
-    sprintf(pwdid_str, "%lld", mysql_insert_id(pconn));
+    //int err = insertRecord(pconn, -1, uid, NULL, "home", "/", 'd', NULL, NULL);
+    // if (err == -1) {
+    //    log_error("insertRecord failed");
+    //     exit(EXIT_FAILURE);
+    // }
+    // char pwdid_str[64] = {0};
+    // sprintf(pwdid_str, "%lld", mysql_insert_id(pconn));
 
     // 更新用户的 pwdid
-    err = userUpdate(pconn, uid, "pwdid", pwdid_str);
-    if (err) {
-        log_error("usreUpdate failed");
-        exit(EXIT_FAILURE);
-    }
+    // err = userUpdate(pconn, uid, "pwdid", pwdid_str);
+    // if (err) {
+    //     log_error("usreUpdate failed");
+    //     exit(EXIT_FAILURE);
+    // }
 
     releaseDBConnection(task->dbpool, pconn);
 
