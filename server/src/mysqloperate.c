@@ -168,14 +168,14 @@ int insertRecord(MYSQL* mysql, int p_id, int u_id, char* f_hash, char* name,
     bind.buffer_length = strlen(name);
     bind.is_null = 0;
 
-    mysql_stmt_bind_param(stmt, &bind);
+    ret = mysql_stmt_bind_param(stmt, &bind);
 
     // 执行语句前先开启事务
-    mysql_query(mysql, "START TRANSACTION");
-    mysql_stmt_execute(stmt);
+    ret = mysql_query(mysql, "START TRANSACTION");
+    ret = mysql_stmt_execute(stmt);
 
     int retval = mysql_insert_id(mysql);
-    mysql_query(mysql, "COMMIT");
+    ret = mysql_query(mysql, "COMMIT");
 
     mysql_stmt_close(stmt);
 

@@ -584,7 +584,7 @@ int getsCmd(Task* task) {
             }
         }
         //此时file_name即文件名,target_pwdid为待插入项的id
-        //检查文件是否完整
+        //检查文件是否完整(不用检查了,我只会将完整的文件目录项设为1)
         
 
 
