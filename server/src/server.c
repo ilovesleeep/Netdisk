@@ -17,7 +17,7 @@ void serverInit(ServerConfig* conf, HashTable* ht) {
 
 int g_exit_pipe[2];
 static void exitHandler(int signo) {
-    printf("[INFO] Exit order received.\n");
+    log_info("Exit order received.");
     write(g_exit_pipe[1], "1", 1);
 }
 
@@ -31,7 +31,7 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
             break;
         default:
             // 父进程
-            printf("[INFO] %d MCV porcess reporting\n", getpid());
+            log_info("%d MCV porcess reporting", getpid());
             close(g_exit_pipe[0]);
             // 捕获 SIGUSR1 信号
             if (signal(SIGUSR1, exitHandler) == SIG_ERR) {
@@ -42,7 +42,7 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
             exit(0);
     }
     // 子进程
-    printf("[INFO] %d Kirov process reporting\n", getpid());
+    log_info("%d Kirov process reporting", getpid());
     close(g_exit_pipe[1]);
 
     // epoll
@@ -115,7 +115,7 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
 
 int serverExit(ThreadPool* pool) {
     // 父进程传来信号
-    printf("[INFO] All the comrades, exit!\n");
+    log_info("All the comrades, exit!");
 
     // 通知各个子线程退出
     for (int j = 0; j < pool->num_threads; j++) {
@@ -128,7 +128,7 @@ int serverExit(ThreadPool* pool) {
     }
 
     // 主线程退出
-    printf("[INFO] For home country, see you!\n");
+    log_info("For home country, see you!");
     pthread_exit(0);
 }
 
@@ -164,7 +164,7 @@ void requestHandler(int connfd, ThreadPool* pool, int* user_table,
     }
 
     if (ret == 0) {
-        printf("[INFO] Say goodbye to connection %d\n", connfd);
+        log_info("Say goodbye to connection %d", connfd);
         user_table[connfd] = 0;
         workdirFree(workdir_table[connfd]);
         close(connfd);

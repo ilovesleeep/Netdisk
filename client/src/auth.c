@@ -94,7 +94,7 @@ static int userRegister2(int sockfd, char* username, char* salt) {
 
         // reg2 for section 2
         char buf[MAXLINE] = {0};
-        sprintf(buf, "reg2 %s %s %s", username, salt, encrytped);
+        sprintf(buf, "reg2 %s %s", username, encrytped);
 
         // 先发长度
         Command cmd = CMD_REG2;
