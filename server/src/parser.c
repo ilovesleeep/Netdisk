@@ -75,10 +75,10 @@ Command getCommand(const char* cmd) {
         return CMD_GETS;
     } else if (strcmp(cmd, "puts") == 0) {
         return CMD_PUTS;
-    } else if (strcmp(cmd, "register1") == 0) {
+    } else if (strcmp(cmd, "reg1") == 0) {
         return CMD_REG1;
-    } else if (strcmp(cmd, "register1") == 0) {
-        return CMD_REG1;
+    } else if (strcmp(cmd, "reg2") == 0) {
+        return CMD_REG2;
     } else if (strcmp(cmd, "login1") == 0) {
         return CMD_LOGIN1;
     } else if (strcmp(cmd, "login2") == 0) {
