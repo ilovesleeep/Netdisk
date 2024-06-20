@@ -1,42 +1,11 @@
+
 #include "../include/mysqloperate.h"
+#define MAX_CHILD_CHARACTER 512
 
-// //获取当前路径,传入连接和用户uid，传出当前目录的索引
-// int getPwdId(MYSQL* mysql, int uid) {
-//     const char sql[60] = "select pwd from nb_usertable where id = ?";
-//     MYSQL_STMT* stmt = mysql_stmt_init(mysql);
-//     mysql_stmt_prepare(stmt, sql, strlen(sql));
-//     //初始化参数
-//     MYSQL_BIND bind;
-//     bzero(&bind, sizeof(bind));
-//     bind.buffer_type = MYSQL_TYPE_LONG;
-//     bind.buffer = &uid;
-//     bind.length = NULL;
-//     bind.is_null = 0;
 
-//     mysql_stmt_bind_param(stmt, &bind);
-
-//     mysql_stmt_execute(stmt);
-
-//     MYSQL_RES* res = mysql_stmt_execute(stmt);
-//     //获取结果
-//     int res_pwd;
-//     MYSQL_BIND res_bind;
-//     bzero(&res_bind, sizeof(res_bind));
-//     res_bind.buffer_type = MYSQL_TYPE_LONG;
-//     res_bind.buffer = &res_pwd;
-//     res_bind.buffer_length = sizeof(int);
-
-//     mysql_stmt_bind_result(stmt, &bind);
-//     mysql_stmt_store_result(stmt);
-//     mysql_stmt_fetch(stmt);
-
-//     mysql_stmt_close(stmt);
-//     mysql_free_result(res);
-
-//     return res_pwd;
-// }
 
 int getPwdId(MYSQL* mysql, int uid) {
+
     int pwdid;
     char sql[60] = {};
     sprintf(sql, "select pwdid from nb_usertable where id=%d", uid);
@@ -135,8 +104,10 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* name,char *type) {
         if (ret == 1 || ret == MYSQL_NO_DATA) {
             fprintf(stderr, "%s", mysql_error(mysql));
             retval = -1;
-        } else if (res_type == 'F') {
-            retval = -1;
+        }
+
+        if (type != NULL) {
+            *type = res_type;
         }
         // type为'D'时retval已完成赋值,直接返回即可
     }
@@ -145,24 +116,68 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* name,char *type) {
 
 char* getPwd(MYSQL* mysql, int pwdid) {}
 
-char** findchild(MYSQL* mysql, int pwdid) {}
+
+char** findchild(MYSQL* mysql, int pwdid, char type){
+    int idx = 0;
+    char** family = (char**)calloc(MAX_CHILD_CHARACTER * 4, sizeof(char*));
+    if (family == NULL) {
+        log_error("malloc: %s", strerror(errno));
+        error(1, errno, "malloc");
+    }
+
+    const char* qurey_str = "select name from nb_vftable where p_id = ";
+    char str[16] = {0};
+    sprintf(str, "%d", pwdid);
+    char query[1024] = {0};
+    sprintf(query,"%s%s", qurey_str, str);
+
+    int ret = mysql_query(mysql, query);
+    if (ret != 0) {
+        log_error("mysql_query: %s", strerror(errno));
+        error(1, errno, "findchild: mysql_query");  
+    } 
+
+    MYSQL_RES* result = mysql_store_result(mysql);
+    if (result) {
+        MYSQL_ROW row;
+        while ((row = mysql_fetch_row(result)) != NULL) {
+            family[idx] = (char*)calloc(MAX_CHILD_CHARACTER * 2, sizeof(char));
+            if (family[idx] == NULL) {
+                while (idx > 0) {
+                    free(family[--idx]);
+                }
+                free(family);
+                mysql_free_result(result);
+                log_error("findchild malloc: %s", strerror(errno));
+                error(1, errno, "findchild malloc");
+            }
+            strcpy(family[idx], *row);
+            //printf("%s\n", *row);
+            row++;
+            idx++;
+        }
+    }
+    family[idx] = NULL;
+    mysql_free_result(result);
+    return family;
+}
 
 // 填入需要插入的值,函数会将值插入MYSQL,返回插入的主键id值,若插入失败则返回-1
 int insertRecord(MYSQL* mysql, int p_id, int u_id, char* f_hash, char* name,
-                 char* path, char type, off_t* f_size, off_t* c_size) {
+                 char* path, char type, off_t* f_size, off_t* c_size, char exist) {
     char sql[1024] = {0};
     if (f_hash == NULL) {
         // 文件没有哈希值,因此是目录
         sprintf(sql,
-                "INSERT INTO nb_vftable(p_id, u_id, name, path, type) "
-                "VALUES(%d, %d, ?, '%s', '%c')",
-                p_id, u_id, path, type);
+                "INSERT INTO nb_vftable(p_id, u_id, name, path, type, exist) "
+                "VALUES(%d, %d, ?, '%s', '%c', '%c')",
+                p_id, u_id, path, type, exist);
     } else {
         // 有哈希值,一定是插入文件
         sprintf(sql,
                 "INSERT INTO nb_vftable(p_id, u_id, f_hash, name, path, type, "
-                "f_size, c_size) VALUES(%d, %d, %s, ?, %s, %c, %ld, %ld)",
-                p_id, u_id, f_hash, path, type, *f_size, *c_size);
+                "f_size, c_size) VALUES(%d, %d, '%s', ?, '%s', '%c', %ld, %ld, '%c')",
+                p_id, u_id, f_hash, path, type, *f_size, *c_size, exist);
     }
 
     MYSQL_STMT* stmt = mysql_stmt_init(mysql);
@@ -175,21 +190,24 @@ int insertRecord(MYSQL* mysql, int p_id, int u_id, char* f_hash, char* name,
 
     MYSQL_BIND bind;
     bzero(&bind, sizeof(bind));
-    bind.buffer_type = MYSQL_TYPE_VARCHAR;
+    bind.buffer_type = MYSQL_TYPE_VAR_STRING;
     bind.buffer = name;
-    bind.buffer_length = strlen(name);
+    unsigned long buf_len = strlen(name);
+    bind.length = &buf_len;
     bind.is_null = 0;
 
-    mysql_stmt_bind_param(stmt, &bind);
+    ret = mysql_stmt_bind_param(stmt, &bind);
 
     // 执行语句前先开启事务
-    mysql_query(mysql, "START TRANSACTION");
-    mysql_stmt_execute(stmt);
+    ret = mysql_query(mysql, "START TRANSACTION");
+    ret = mysql_stmt_execute(stmt);
 
     int retval = mysql_insert_id(mysql);
-    mysql_query(mysql, "COMMIT");
+    ret = mysql_query(mysql, "COMMIT");
 
     mysql_stmt_close(stmt);
 
     return retval;
+
+
 }
