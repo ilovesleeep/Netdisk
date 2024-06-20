@@ -1,7 +1,6 @@
 #include "../include/auth.h"
 
 #include <crypt.h>
-#include <shadow.h>
 
 #define MAXLINE 1024
 #define MAX_NAME_LENGTH 20
@@ -47,9 +46,8 @@ static int userRegister1(int sockfd, char* username, char* salt) {
         int buf_len = strlen(buf);
         int data_len = sizeof(cmd) + buf_len;
         sendn(sockfd, &data_len, sizeof(int));
-        // 再发命令类型
-        sendn(sockfd, &cmd, sizeof(cmd));
         // 再发内容
+        sendn(sockfd, &cmd, sizeof(cmd));
         sendn(sockfd, buf, buf_len);
 
         // 接收状态
@@ -81,9 +79,15 @@ static int userRegister2(int sockfd, char* username, char* salt) {
     while (1) {
         char* passwd = NULL;
         char* confirm_passwd = NULL;
+        int count = 0;
         do {
+            if (++count == 3) {
+                printf("Too many tries, exit.\n");
+                exit(EXIT_SUCCESS);
+            }
+
             if (passwd != NULL) {
-                printf("The two entries do not match, please re-enter\n");
+                printf("The two entries are invalid, please re-enter\n");
             }
             passwd = getpass("Password: ");
             confirm_passwd = getpass("Confirm password: ");
@@ -116,6 +120,9 @@ static int userRegister2(int sockfd, char* username, char* salt) {
                 "shortly.\n");
             sleep(1);
             break;
+        } else {
+            printf("Register failed, exit\n");
+            exit(EXIT_FAILURE);
         }
     }
     return 0;
@@ -180,11 +187,12 @@ static int userLogin1(int sockfd, char* name, char* salt) {
 }
 
 static int userLogin2(int sockfd, char* salt) {
+    int count = 0;
     while (1) {
-        // printf("Enter password: ");
-        // fflush(stdout);
-        // int passwd_len = read(STDIN_FILENO, passwd, MAX_USERINFO_LENGTH);
-        // passwd[--passwd_len] = '\0';
+        if (++count == 3) {
+            printf("Too many incorrect password attempts, exit.");
+            exit(EXIT_SUCCESS);
+        }
 
         char* passwd = getpass("password: ");
         char* encrytped = crypt(passwd, salt);

@@ -450,48 +450,7 @@ void lsCmd(Task* task) {
 }
 
 // 使用单独的函数来实现命令的功能
-int deleteDir(const char* dir) {
-    // 打开目录
-    DIR* stream = opendir(dir);
-    if (stream == NULL) {
-        if (errno == ENOENT) {
-            fprintf(stderr, "rm: 无法删除'%s' : 没有那个文件或者目录\n", dir);
-            return errno;
-        }
-    }
-
-    // 遍历目录流，依次删除每一个目录项
-    errno = 0;
-    struct dirent* pdirent;
-    while ((pdirent = readdir(stream)) != NULL) {
-        // 忽略.和..
-        char* name = pdirent->d_name;
-        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
-            continue;
-        }
-
-        // 注意，这里才开始拼接路径
-        char subpath[MAXLINE];
-        sprintf(subpath, "%s/%s", dir, name);
-        if (pdirent->d_type == DT_DIR) {
-            // 拼接路径
-            deleteDir(subpath);
-        } else if (pdirent->d_type == DT_REG) {
-            unlink(subpath);
-        }
-    }
-
-    // 关闭目录流
-    closedir(stream);
-
-    if (errno) {
-        error(1, errno, "readdir");
-    }
-    // 再删除该目录
-    rmdir(dir);
-
-    return 0;
-}
+int deleteDir(const char* dir) {}
 
 void rmCmd(Task* task) {
     // TODO:
@@ -582,24 +541,23 @@ int getsCmd(Task* task) {
     while (*(++parameter)) {
         static int i = 0;  // 第一个文件
         i++;
-
-        char file_name[128] = {0};
-        int target_pwdid = pwdid;
-        for (char* p = parameter[i]; *p; p++) {
-            for (char* start = p; *p != '/' && *p != '\0'; p++) {
+        char file_name[512] = {0};
+        for (char* p = parameter; *p; p++) {
+            int target_pwdid = pwdid;
+            for (char* start = p; *p != '\0' && *p != '/'; p++) {
                 if (*(p + 1) == '/') {
                     bzero(file_name, sizeof(file_name));
                     strncpy(file_name, start, p - start + 1);
+                    // user2 change here, add 4th parameter as NULL
                     target_pwdid =
-                        goToRelativeDir(mysql, target_pwdid, file_name);
+                        goToRelativeDir(mysql, target_pwdid, file_name, NULL);
                     if (target_pwdid == -1) {
                         // 路径错误
                         //***消息对接***
                         return 0;
                     }
-                    break;
-                }
-                if (*(p + 1) == '\0') {
+                } else if (*(p + 1) == '\0') {
+                    // 此时start是文件名,
                     strcpy(file_name, start);
                     break;
                 }
@@ -869,23 +827,26 @@ void regCheck2(Task* task) {
     MYSQL* pconn = getDBConnection(task->dbpool);
 
     // 插入用户记录到 nb_usertable
-    int uid = userInsert(pconn, username, cryptpasswd, 1);
+
+    long long pwdid = 0;
+    int uid = userInsert(pconn, username, cryptpasswd, pwdid);
 
     // 插入用户目录记录到 nb_vftable
-    //int err = insertRecord(pconn, -1, uid, NULL, "home", "/", 'd', NULL, NULL);
-    // if (err == -1) {
-    //    log_error("insertRecord failed");
-    //     exit(EXIT_FAILURE);
-    // }
-    // char pwdid_str[64] = {0};
-    // sprintf(pwdid_str, "%lld", mysql_insert_id(pconn));
+    pwdid = insertRecord(pconn, -1, uid, NULL, "home", "/", 'd', NULL, NULL);
+    if (pwdid == -1) {
+        log_error("insertRecord failed");
+        exit(EXIT_FAILURE);
+    }
+    char pwdid_str[64] = {0};
+    sprintf(pwdid_str, "%lld", pwdid);
 
     // 更新用户的 pwdid
-    // err = userUpdate(pconn, uid, "pwdid", pwdid_str);
-    // if (err) {
-    //     log_error("usreUpdate failed");
-    //     exit(EXIT_FAILURE);
-    // }
+    int err = userUpdate(pconn, uid, "pwdid", pwdid_str);
+    if (err) {
+        log_error("userUpdate failed");
+        exit(EXIT_FAILURE);
+    }
+
 
     releaseDBConnection(task->dbpool, pconn);
 
