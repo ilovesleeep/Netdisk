@@ -28,6 +28,9 @@ static int userRegister1(int sockfd, char* username, char* salt) {
         if (name_len > MAX_NAME_LENGTH) {
             printf("Max name length is 20, please re-enter\n");
             continue;
+        } else if (name_len == 1) {
+            printf("Min name length is 1, please re-enter\n");
+            continue;
         }
         for (int i = 0; i < name_len; ++i) {
             if (name[i] == ' ') {
