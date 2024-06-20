@@ -107,7 +107,7 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* path, char* type) {
 char* getPwd(MYSQL* mysql, int pwdid) {}
 
 
-char** findchild(MYSQL* mysql, int pwdid){
+char** findchild(MYSQL* mysql, int pwdid, char type){
     int idx = 0;
     char** family = (char**)calloc(MAX_CHILD_CHARACTER * 4, sizeof(char*));
     if (family == NULL) {

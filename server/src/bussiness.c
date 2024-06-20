@@ -439,6 +439,10 @@ void lsCmd(Task* task) {
         strncat(result, "\t", sizeof(result) - strlen("\t"));
         family++;
     }
+
+    for (int i = 0; family[i] != NULL; ++i) {
+        free(family);
+    }
     free(family);
     
     // 发送（大火车）
