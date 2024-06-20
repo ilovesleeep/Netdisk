@@ -72,17 +72,10 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* name,char *type) {
         bind[0].buffer = &pwd;
         bind[0].length = NULL;
         bind[0].is_null = 0;
-<<<<<<< HEAD
         
-        unsigned long path_len = strlen(path);
-        bind[1].buffer_type = MYSQL_TYPE_VAR_STRING;
-        bind[1].buffer = path;
-        bind[1].length = &path_len;
-=======
         bind[1].buffer_type = MYSQL_TYPE_VARCHAR;
         bind[1].buffer = name;
         bind[1].buffer_length = strlen(sql);
->>>>>>> refs/remotes/origin/dev
         bind[1].is_null = 0;
         mysql_stmt_bind_param(stmt, bind);
 
@@ -123,9 +116,6 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* name,char *type) {
     return retval;
 }
 
-char* getPwd(MYSQL* mysql, int pwdid) {}
-
-<<<<<<< HEAD
 int getPwd(MYSQL* mysql, int pwdid, char* path, int path_size){
 
     // 初始化MYSQL_STMT
@@ -137,7 +127,7 @@ int getPwd(MYSQL* mysql, int pwdid, char* path, int path_size){
     int ret = mysql_stmt_prepare(stmt, sql, strlen(sql));
     if (ret) {
         fprintf(stderr, "%s\n", mysql_error(mysql));
-        exit(-1);
+        return -1;
     }
 
     // 设置参数
@@ -163,13 +153,13 @@ int getPwd(MYSQL* mysql, int pwdid, char* path, int path_size){
     // 执行EXECUTE操作
     ret = mysql_stmt_execute(stmt);
     if (ret) {
-        exit(-1);
+        return -1;
     }
 
     // 先获取field字段
     MYSQL_RES *res = mysql_stmt_result_metadata(stmt);
     if (res) {
-        exit(-1);
+        return -1;
     }
 
     // 设置输出参数
@@ -194,17 +184,6 @@ int getPwd(MYSQL* mysql, int pwdid, char* path, int path_size){
     return 0;
 }
 
-char** findchild(MYSQL*mysql, int pwdid){
-
-}
-
-//填入需要插入的值,函数会将值插入MYSQL,返回插入的主键id值,若插入失败则返回-1
-int insertRecord(MYSQL* mysql, int p_id, int u_id, char* f_hash, char* name, char* path, char type, off_t* f_size, off_t* c_size){
-    char sql[1024] = {0};
-    if(f_hash == NULL){
-        //文件没有哈希值,因此是目录
-        sprintf(sql, "INSERT INTO nb_vftable(p_id, u_id, name, path, type) VALUES(%d, %d, ?, %s, %c)", p_id, u_id, path, type);
-=======
 
 char** findchild(MYSQL* mysql, int pwdid, char type){
     int idx = 0;
@@ -212,7 +191,6 @@ char** findchild(MYSQL* mysql, int pwdid, char type){
     if (family == NULL) {
         log_error("malloc: %s", strerror(errno));
         error(1, errno, "malloc");
->>>>>>> refs/remotes/origin/dev
     }
 
     const char* qurey_str = "select name from nb_vftable where p_id = ";
@@ -282,12 +260,8 @@ int insertRecord(MYSQL* mysql, int p_id, int u_id, char* f_hash, char* name,
     bzero(&bind, sizeof(bind));
     bind.buffer_type = MYSQL_TYPE_VAR_STRING;
     bind.buffer = name;
-<<<<<<< HEAD
-    bind.buffer_length = strlen(name);
-=======
     unsigned long buf_len = strlen(name);
     bind.length = &buf_len;
->>>>>>> refs/remotes/origin/dev
     bind.is_null = 0;
 
     ret = mysql_stmt_bind_param(stmt, &bind);
@@ -302,10 +276,4 @@ int insertRecord(MYSQL* mysql, int p_id, int u_id, char* f_hash, char* name,
     mysql_stmt_close(stmt);
 
     return retval;
-<<<<<<< HEAD
 }
-=======
-
-
-}
->>>>>>> refs/remotes/origin/dev
