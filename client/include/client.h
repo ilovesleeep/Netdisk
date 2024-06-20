@@ -8,6 +8,7 @@
 #include "head.h"
 #include "network.h"
 #include "parser.h"
+#include "threadpool.h"
 
 int clientMain(int argc, char* argv[]);
 
