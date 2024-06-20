@@ -71,7 +71,7 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
     // 存储用户当前目录
     WorkDir* workdir_table[MAXEVENTS] = {0};
 
-    // 存储用户当前目录
+    // 存储 uid
     int user_table[MAXUSER] = {0};
 
     // 主循环
@@ -119,7 +119,7 @@ int serverExit(ThreadPool* pool) {
 
     // 通知各个子线程退出
     for (int j = 0; j < pool->num_threads; j++) {
-        Task exit_task = {-1, -1, 0, NULL, NULL, NULL};
+        Task exit_task = {-1, 0, NULL, 0, NULL, NULL, NULL};
         blockqPush(pool->task_queue, &exit_task);
     }
     // 等待各个子线程退出
@@ -135,22 +135,26 @@ int serverExit(ThreadPool* pool) {
 void requestHandler(int connfd, ThreadPool* pool, int* user_table,
                     DBConnectionPool* dbpool, WorkDir** workdir_table) {
     // 接收、处理请求
-    // 先接长度
-    int req_len = -1;
-    int ret = recv(connfd, &req_len, sizeof(int), MSG_WAITALL);
+    // 先接总长度
+    int request_len = -1;
+    int ret = recv(connfd, &request_len, sizeof(int), MSG_WAITALL);
 
-    if (req_len > 0) {
+    if (request_len > 0) {
         // 再接内容
-        char req[MAXLINE] = {0};
-        ret = recv(connfd, req, req_len, MSG_WAITALL);
+        Command cmd = -1;
+        char data[MAXLINE] = {0};
+        int data_len = request_len - sizeof(cmd);
+        ret = recv(connfd, &cmd, sizeof(cmd), MSG_WAITALL);
+        ret = recv(connfd, data, data_len, MSG_WAITALL);
 
         if (ret > 0) {
             // 创建任务
             Task* task = (Task*)malloc(sizeof(Task));
             task->fd = connfd;
             task->uid = user_table[connfd];
-            task->args = getArgs(req);
-            task->cmd = getCommand(task->args[0]);
+            task->u_table = user_table;
+            task->args = getArgs(data);
+            task->cmd = cmd;
             task->dbpool = dbpool;
             task->wd_table = workdir_table;
 
@@ -161,6 +165,7 @@ void requestHandler(int connfd, ThreadPool* pool, int* user_table,
 
     if (ret == 0) {
         printf("[INFO] Say goodbye to connection %d\n", connfd);
+        user_table[connfd] = 0;
         workdirFree(workdir_table[connfd]);
         close(connfd);
     } else if (ret < 0) {

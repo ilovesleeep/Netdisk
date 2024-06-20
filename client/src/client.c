@@ -1,7 +1,7 @@
 #include "../include/client.h"
 
 #define MAXLINE 1024
-#define MAX_NAME_LENGTH 32
+#define MAX_NAME_LENGTH 20
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
@@ -12,7 +12,7 @@ int main(int argc, char* argv[]) {
 
     printMenu();
 
-    char username[MAX_NAME_LENGTH] = {0};
+    char username[MAX_NAME_LENGTH + 1] = {0};
 
     welcome(sockfd, username);
 
@@ -82,13 +82,21 @@ void welcome(int sockfd, char* username) {
         switch (option) {
             case 1:
                 userLogin(sockfd, username);
+                system("clear");
+                printf(
+                    "\033[47;30m Sir, this way! What can I do for you? "
+                    "\033[0m\n\n");
                 break;
             case 2:
                 userRegister(sockfd);
-                // printf(
-                //    "Registration requires v50 to us, please contact
-                //    admin\n");
-                exit(EXIT_SUCCESS);
+                system("clear");
+                printMenu();
+                option = -1;
+                break;
+            // printf(
+            //    "Registration requires v50 to us, please contact
+            //    admin\n");
+            // exit(EXIT_SUCCESS);
             case 3:
                 printf("See you\n");
                 exit(EXIT_SUCCESS);
