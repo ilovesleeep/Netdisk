@@ -124,3 +124,45 @@ char* getPwd(MYSQL* mysql, int pwdid){
 char** findchild(MYSQL*mysql, int pwdid){
 
 }
+
+//填入需要插入的值,函数会将值插入MYSQL,返回插入的主键id值,若插入失败则返回-1
+int insertRecord(MYSQL* mysql, int p_id, int u_id, char* f_hash, char* name, char* path, char type, off_t* f_size, off_t* c_size){
+    char sql[1024] = {0};
+    if(f_hash == NULL){
+        //文件没有哈希值,因此是目录
+        sprintf(sql, "INSERT INTO nb_vftable(p_id, u_id, name, path, type) VALUES(%d, %d, ?, %s, %c)", p_id, u_id, path, type);
+    }
+    else{
+        //有哈希值,一定是插入文件
+        sprintf(sql, "INSERT INTO nb_vftable(p_id, u_id, f_hash, name, path, type, f_size, c_size) VALUES(%d, %d, %s, ?, %s, %c, %ld, %ld)",
+                                            p_id, u_id, f_hash, path, type, f_size, c_size);
+    }
+
+    MYSQL_STMT* stmt = mysql_stmt_init(mysql);
+    
+    int ret = mysql_stmt_prepare(stmt, sql, strlen(sql));
+    if(ret){
+        fprintf(stderr, "%s\n", mysql_error(mysql));
+        return -1;
+    }
+
+    MYSQL_BIND bind;
+    bzero(&bind, sizeof(bind));
+    bind.buffer_type = MYSQL_TYPE_VARCHAR;
+    bind.buffer = name;
+    bind.buffer_type = strlen(name);
+    bind.is_null = 0;
+
+    mysql_stmt_bind_param(stmt, &bind);
+
+    //执行语句前先开启事务
+    mysql_query(mysql, "START TRANSACTION");
+    mysql_stmt_execute(stmt);
+
+    int retval = mysql_insert_id(mysql);
+    mysql_query(mysql, "COMMIT");
+
+    mysql_stmt_close(stmt);
+
+    return retval;
+}

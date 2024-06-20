@@ -578,16 +578,37 @@ int getsCmd(Task* task) {
 
     //获取一个mysql连接
     MYSQL* mysql = getDBConnection(task->dbpool);
-    
-    int pwd = getpwd(mysql, task->uid);
+    //获取当前路径
+    int pwdid = getPwdId(mysql, task->uid);
 
     // 发送文件
     char** parameter = task->args;
     while (*(++parameter)) {
         static int i = 0;  // 第一个文件
         i++;
-        char path_file[1000] = {0};
-        sprintf(path_file, "%s/%s", path, *parameter);
+
+        char file_name[128] = {0};
+        int target_pwdid = pwdid;
+        for(char* p = parameter[i]; *p; p++){
+            for(char* start = p; *p != '/' && *p != '\0'; p++){
+                if(*(p + 1) == '/'){
+                    bzero(file_name, sizeof(file_name));
+                    strncpy(file_name, start, p - start + 1);
+                    target_pwdid = goToRelativeDir(mysql, target_pwdid, file_name);
+                    if(target_pwdid == -1){
+                        //路径错误
+                        //***消息对接***
+                        return 0;
+                    }
+                    break;
+                }
+                if(*(p + 1) == '\0'){
+                    strcpy(file_name, start);
+                    break;
+                }
+            }
+        }
+        //此时file_name即文件名
 
         int fd = open(path_file, O_RDWR);
         // 检查文件是否存在
