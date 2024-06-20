@@ -122,8 +122,8 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* path, char* type) {
             fprintf(stderr, "%s", mysql_error(mysql));
             retval = -1;
         }
-            
-        if(type != NULL){
+
+        if (type != NULL) {
             *type = res_type;
         }
         // type为'D'时retval已完成赋值,直接返回即可

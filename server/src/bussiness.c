@@ -548,6 +548,7 @@ int getsCmd(Task* task) {
                 if (*(p + 1) == '/') {
                     bzero(file_name, sizeof(file_name));
                     strncpy(file_name, start, p - start + 1);
+                    // user2 change here, add 4th parameter as NULL
                     target_pwdid =
                         goToRelativeDir(mysql, target_pwdid, file_name, NULL);
                     if (target_pwdid == -1) {
