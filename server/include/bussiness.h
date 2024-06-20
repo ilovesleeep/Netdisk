@@ -7,6 +7,7 @@
 #include "dbpool.h"
 #include "head.h"
 #include "log.h"
+#include "mysqloperate.h"
 #include "parser.h"
 
 typedef struct {
