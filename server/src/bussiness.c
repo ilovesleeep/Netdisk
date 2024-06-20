@@ -409,14 +409,16 @@ int cdCmd(Task* task) {
 }
 
 void lsCmd(Task* task) {
+
     // 校验参数,发送校验结果，若为错误则继续发送错误信息
     if (task->args[1] != NULL) {
         int sendstat = 1;
         send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
-        char error_info[] = "parameter number error";
+        char* error_info = "parameter number error";
         int info_len = strlen(error_info);
         send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
         send(task->fd, error_info, info_len, MSG_NOSIGNAL);
+        log_error("lsCmd: parameter number error");
         return;
     } else {
         int sendstat = 0;
@@ -424,29 +426,26 @@ void lsCmd(Task* task) {
     }
 
     // 获取当前路径
-    char path[1000] = {0};
-    WorkDir* pathbase = task->wd_table[task->fd];
-    strncpy(path, pathbase->path, pathbase->index[pathbase->index[0]] + 1);
+    MYSQL* mysql = getDBConnection(task->dbpool); 
+    // int pwdid = getPwdId(mysql, task->uid);
+    int pwdid = 1;
+    char** family = findchild(mysql, pwdid);
+    releaseDBConnection(task->dbpool, mysql);
 
-    // 打开目录
-    DIR* dir = opendir(pathbase->path);
+    // bufsize = 4096
+    char result[BUFSIZE] = {0};
 
-    // 发送文件信息
-    struct dirent* p = NULL;
-    while ((p = readdir(dir))) {
-        if (strcmp(p->d_name, ".") == 0 || strcmp(p->d_name, "..") == 0) {
-            continue;
-        }
-        int info_len = strlen(p->d_name);
-        char send_info[1000] = {0};
-        strcpy(send_info, p->d_name);
-        // 发送文件名长度及文件名
-        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-        send(task->fd, send_info, info_len, MSG_NOSIGNAL);
+    while (*family != NULL) {
+        strncat(result, *family, sizeof(result) - strlen(*family) - 1);
+        strncat(result, "\t", sizeof(result) - strlen("\t"));
+        family++;
     }
-    // 发送int类型的0(这个文件名长度为0)代表文件已发完
-    int info_len = 0;
+    
+    // 发送（大火车）
+    int info_len = strlen(result);
     send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+    send(task->fd, result, info_len, MSG_NOSIGNAL);
+
     return;
 }
 
