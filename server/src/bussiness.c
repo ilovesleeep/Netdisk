@@ -451,46 +451,7 @@ void lsCmd(Task* task) {
 
 // 使用单独的函数来实现命令的功能
 int deleteDir(const char* dir) {
-    // 打开目录
-    DIR* stream = opendir(dir);
-    if (stream == NULL) {
-        if (errno == ENOENT) {
-            fprintf(stderr, "rm: 无法删除'%s' : 没有那个文件或者目录\n", dir);
-            return errno;
-        }
-    }
-
-    // 遍历目录流，依次删除每一个目录项
-    errno = 0;
-    struct dirent* pdirent;
-    while ((pdirent = readdir(stream)) != NULL) {
-        // 忽略.和..
-        char* name = pdirent->d_name;
-        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
-            continue;
-        }
-
-        // 注意，这里才开始拼接路径
-        char subpath[MAXLINE];
-        sprintf(subpath, "%s/%s", dir, name);
-        if (pdirent->d_type == DT_DIR) {
-            // 拼接路径
-            deleteDir(subpath);
-        } else if (pdirent->d_type == DT_REG) {
-            unlink(subpath);
-        }
-    }
-
-    // 关闭目录流
-    closedir(stream);
-
-    if (errno) {
-        error(1, errno, "readdir");
-    }
-    // 再删除该目录
-    rmdir(dir);
-
-    return 0;
+    
 }
 
 void rmCmd(Task* task) {
@@ -871,6 +832,7 @@ void regCheck2(Task* task) {
     int uid = userInsert(pconn, username, cryptpasswd, 0);
 
     // 插入用户目录记录到 nb_vftable
+    
     int err = insertRecord(pconn, -1, uid, NULL, "home", "/", 'd', NULL, NULL);
     if (err == -1) {
         log_error("insertRecord failed");
