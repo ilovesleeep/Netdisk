@@ -408,14 +408,16 @@ int cdCmd(Task* task) {
 }
 
 void lsCmd(Task* task) {
+
     // 校验参数,发送校验结果，若为错误则继续发送错误信息
     if (task->args[1] != NULL) {
         int sendstat = 1;
         send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
-        char error_info[] = "parameter number error";
+        char* error_info = "parameter number error";
         int info_len = strlen(error_info);
         send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
         send(task->fd, error_info, info_len, MSG_NOSIGNAL);
+        log_error("lsCmd: parameter number error");
         return;
     } else {
         int sendstat = 0;
@@ -423,29 +425,31 @@ void lsCmd(Task* task) {
     }
 
     // 获取当前路径
-    char path[1000] = {0};
-    WorkDir* pathbase = task->wd_table[task->fd];
-    strncpy(path, pathbase->path, pathbase->index[pathbase->index[0]] + 1);
+    MYSQL* mysql = getDBConnection(task->dbpool); 
+    // int pwdid = getPwdId(mysql, task->uid);
+    int pwdid = 1;
+    char** family = findchild(mysql, pwdid);
+    releaseDBConnection(task->dbpool, mysql);
 
-    // 打开目录
-    DIR* dir = opendir(pathbase->path);
+    // bufsize = 4096
+    char result[BUFSIZE] = {0};
 
-    // 发送文件信息
-    struct dirent* p = NULL;
-    while ((p = readdir(dir))) {
-        if (strcmp(p->d_name, ".") == 0 || strcmp(p->d_name, "..") == 0) {
-            continue;
-        }
-        int info_len = strlen(p->d_name);
-        char send_info[1000] = {0};
-        strcpy(send_info, p->d_name);
-        // 发送文件名长度及文件名
-        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-        send(task->fd, send_info, info_len, MSG_NOSIGNAL);
+    while (*family != NULL) {
+        strncat(result, *family, sizeof(result) - strlen(*family) - 1);
+        strncat(result, "\t", sizeof(result) - strlen("\t"));
+        family++;
     }
-    // 发送int类型的0(这个文件名长度为0)代表文件已发完
-    int info_len = 0;
+
+    for (int i = 0; family[i] != NULL; ++i) {
+        free(family);
+    }
+    free(family);
+    
+    // 发送（大火车）
+    int info_len = strlen(result);
     send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+    send(task->fd, result, info_len, MSG_NOSIGNAL);
+
     return;
 }
 
@@ -619,33 +623,60 @@ int getsCmd(Task* task) {
 
     // 发送文件
     char** parameter = task->args;
-    while (*(++parameter)) {
-        static int i = 0;  // 第一个文件
-        i++;
-
-        char file_name[128] = {0};
+    for(int i = 1; parameter[i]; i++){
+        char file_name[512] = {0};
         int target_pwdid = pwdid;
-        for (char* p = parameter[i]; *p; p++) {
-            for (char* start = p; *p != '/' && *p != '\0'; p++) {
-                if (*(p + 1) == '/') {
+        for(char* p = parameter[i]; *p != '\0'; p++){
+            for(char* start = p; *p != '\0' && *p != '/'; p++){
+                if(*(p + 1) == '/'){
                     bzero(file_name, sizeof(file_name));
                     strncpy(file_name, start, p - start + 1);
                     target_pwdid =
-                        goToRelativeDir(mysql, target_pwdid, file_name,NULL);
+                        goToRelativeDir(mysql, target_pwdid, file_name);
                     if (target_pwdid == -1) {
                         // 路径错误
                         //***消息对接***
+                        int send_stat = 1;
+                        sendn(task->fd, &send_stat, sizeof(int));
+                        char send_info = "path not exist";
+                        int info_len = strlen(send_info);
+                        sendn(task->fd, &info_len, sizeof(int));
+                        sendn(task->fd, send_info, info_len);
+                        //资源释放
+                        releaseDBConnection(task->dbpool, mysql);
                         return 0;
                     }
-                    break;
                 }
-                if (*(p + 1) == '\0') {
+                else if(*(p + 1) == '\0'){
+                    //此时start是文件名,target_pwdid为待插入项的父目录id
+                    char type;
+                    target_pwdid = goToRelativeDir(mysql, target_pwdid, file_name, &type);
+                    if(type == 'D'){
+                        //最后文件名对应的是一个路径,本网盘暂不支持传输文件夹功能
+                        //***消息对接***
+                        int send_stat = 1;
+                        sendn(task->fd, &send_stat, sizeof(int));
+                        char send_info = "Don't support transmiting directory";
+                        int info_len = strlen(send_info);
+                        sendn(task->fd, &info_len, sizeof(int));
+                        sendn(task->fd, send_info, info_len);
+                        //资源释放
+                        releaseDBConnection(task->dbpool, mysql);
+                        return 0;
+                    }
                     strcpy(file_name, start);
                     break;
                 }
             }
         }
-        // 此时file_name即文件名
+        //此时file_name即文件名,target_pwdid为待插入项的id
+        //检查文件是否完整(不用检查了,我只会将完整的文件目录项设为1)
+        
+
+
+
+
+
 
         char* path_file = NULL;
         int fd = open(path_file, O_RDWR);
@@ -719,10 +750,16 @@ void mkdirCmd(Task* task) {
     if (task->args[1] == NULL) {  // missing operand
         char errmsg[MAXLINE] = "mkdir: missing operand";
         send(task->fd, errmsg, strlen(errmsg), 0);
-        // 后面补日志
+        log_error("mkdirCmd: missing operand");
         error(0, errno, "%d mkdir:", task->fd);
         return;
     }
+
+
+
+
+
+
 
     // if (sizeof(task ->args[1]) >= 1000) {
     //     error(1, 0, "mkdir_dirlen too long!");
@@ -903,23 +940,26 @@ void regCheck2(Task* task) {
     MYSQL* pconn = getDBConnection(task->dbpool);
 
     // 插入用户记录到 nb_usertable
-    int uid = userInsert(pconn, username, cryptpasswd, 0);
+
+    long long pwdid = 0;
+    int uid = userInsert(pconn, username, cryptpasswd, pwdid);
 
     // 插入用户目录记录到 nb_vftable
-    int err = insertRecord(pconn, -1, uid, NULL, "home", "/", 'd', NULL, NULL);
-    if (err == -1) {
+    pwdid = insertRecord(pconn, -1, uid, NULL, "home", "/", 'd', NULL, NULL);
+    if (pwdid == -1) {
         log_error("insertRecord failed");
         exit(EXIT_FAILURE);
     }
     char pwdid_str[64] = {0};
-    sprintf(pwdid_str, "%lld", mysql_insert_id(pconn));
+    sprintf(pwdid_str, "%lld", pwdid);
 
     // 更新用户的 pwdid
-    err = userUpdate(pconn, uid, "pwdid", pwdid_str);
+    int err = userUpdate(pconn, uid, "pwdid", pwdid_str);
     if (err) {
-        log_error("usreUpdate failed");
+        log_error("userUpdate failed");
         exit(EXIT_FAILURE);
     }
+
 
     releaseDBConnection(task->dbpool, pconn);
 

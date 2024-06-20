@@ -47,17 +47,24 @@ char* getCryptpasswdByUID(MYSQL* pconn, int uid) {
     snprintf(query, sizeof(query),
              "SELECT cryptpasswd FROM nb_usertable WHERE id = %d", uid);
 
+    // 开始事务
+    mysql_query(pconn, "START TRANSACTION");
     int err = mysql_query(pconn, query);
     if (err) {
-        log_error("[ERROR] mysql_query() failed: %s\n", mysql_error(pconn));
-        error(1, 0, "[ERROR] mysql_query() failed: %s\n", mysql_error(pconn));
+        // 出错，回滚事务
+        mysql_query(pconn, "ROLLBACK");
+        log_error("[ERROR] mysql_query() failed: %s", mysql_error(pconn));
+        exit(EXIT_FAILURE);
     }
 
     MYSQL_RES* res = mysql_store_result(pconn);
     if (res == NULL) {
-        error(1, 0, "[ERROR] mysql_store_result() failed: %s\n",
-              mysql_error(pconn));
+        log_error("[ERROR] mysql_store_result() failed: %s",
+                  mysql_error(pconn));
+        exit(EXIT_FAILURE);
     }
+    // 提交事务
+    mysql_query(pconn, "COMMIT");
 
     MYSQL_ROW row;
     char* cryptpasswd = NULL;
@@ -65,13 +72,15 @@ char* getCryptpasswdByUID(MYSQL* pconn, int uid) {
     if ((row = mysql_fetch_row(res))) {
         unsigned long* lengths = mysql_fetch_lengths(res);
         if (lengths == NULL) {
-            error(1, 0, "[ERROR] mysql_fetch_lengths() failed: %s\n",
-                  mysql_error(pconn));
+            log_error("[ERROR] mysql_fetch_lengths() failed: %s",
+                      mysql_error(pconn));
+            exit(EXIT_FAILURE);
         }
 
         cryptpasswd = (char*)malloc(lengths[0] + 1);
         if (cryptpasswd == NULL) {
-            error(1, 0, "[ERROR] Memory allocation failed\n");
+            log_error("[ERROR] Memory allocation failed");
+            exit(EXIT_FAILURE);
         }
 
         strncpy(cryptpasswd, row[0], lengths[0]);
@@ -90,14 +99,13 @@ int getUserIDByUsername(MYSQL* pconn, const char* username) {
 
     if (stmt == NULL) {
         log_error("mysql_stmt_init() failed");
-        error(1, 0, "[ERROR] mysql_stmt_init() failed\n");
+        exit(EXIT_FAILURE);
     }
 
     if (mysql_stmt_prepare(stmt, query, strlen(query))) {
-        log_error("[ERROR] mysql_stmt_prepare() failed: %s\n",
+        log_error("[ERROR] mysql_stmt_prepare() failed: %s",
                   mysql_stmt_error(stmt));
-        error(1, 0, "[ERROR] mysql_stmt_prepare() failed: %s\n",
-              mysql_stmt_error(stmt));
+        exit(EXIT_FAILURE);
     }
 
     MYSQL_BIND bind[1];
@@ -108,24 +116,29 @@ int getUserIDByUsername(MYSQL* pconn, const char* username) {
     bind[0].buffer_length = strlen(username);
 
     if (mysql_stmt_bind_param(stmt, bind)) {
-        log_error("[ERROR] mysql_stmt_bind_param() failed: %s\n",
+        log_error("[ERROR] mysql_stmt_bind_param() failed: %s",
                   mysql_stmt_error(stmt));
-        error(1, 0, "[ERROR] mysql_stmt_bind_param() failed: %s\n",
-              mysql_stmt_error(stmt));
+        exit(EXIT_FAILURE);
     }
 
+    // 开始事务
+    mysql_query(pconn, "START TRANSACTION");
     if (mysql_stmt_execute(stmt)) {
-        log_error("[ERROR] mysql_stmt_execute() failed: %s\n",
+        // 出错，回滚事务
+        mysql_query(pconn, "ROLLBACK");
+        log_error("[ERROR] mysql_stmt_execute() failed: %s",
                   mysql_stmt_error(stmt));
-        error(1, 0, "[ERROR] mysql_stmt_execute() failed: %s\n",
-              mysql_stmt_error(stmt));
+        exit(EXIT_FAILURE);
     }
 
     MYSQL_RES* res = mysql_stmt_result_metadata(stmt);
     if (res == NULL) {
+        log_error("stmt result");
         mysql_stmt_close(stmt);
-        return false;
+        exit(EXIT_FAILURE);
     }
+    // 提交事务
+    mysql_query(pconn, "COMMIT");
 
     int user_id = 0;
     MYSQL_BIND res_bind[1];
@@ -136,18 +149,16 @@ int getUserIDByUsername(MYSQL* pconn, const char* username) {
     res_bind[0].buffer_length = sizeof(int);
 
     if (mysql_stmt_bind_result(stmt, res_bind)) {
-        log_error("[ERROR] mysql_stmt_bind_result() failed: %s\n",
+        log_error("[ERROR] mysql_stmt_bind_result() failed: %s",
                   mysql_stmt_error(stmt));
-        error(1, 0, "[ERROR] mysql_stmt_bind_result() failed: %s\n",
-              mysql_stmt_error(stmt));
+        exit(EXIT_FAILURE);
     }
 
     if (mysql_stmt_fetch(stmt) != 0 &&
         mysql_stmt_fetch(stmt) != MYSQL_NO_DATA) {
-        log_error("[ERROR] mysql_stmt_fetch() failed: %s\n",
+        log_error("[ERROR] mysql_stmt_fetch() failed: %s",
                   mysql_stmt_error(stmt));
-        error(1, 0, "[ERROR] mysql_stmt_fetch() failed: %s\n",
-              mysql_stmt_error(stmt));
+        exit(EXIT_FAILURE);
     }
 
     mysql_free_result(res);
@@ -162,12 +173,13 @@ bool userExist(MYSQL* pconn, const char* username) {
 
     if (stmt == NULL) {
         log_error("mysql_stmt_init() failed");
-        error(1, 0, "[ERROR] mysql_stmt_init() failed\n");
+        exit(EXIT_FAILURE);
     }
 
     if (mysql_stmt_prepare(stmt, query, strlen(query))) {
-        error(1, 0, "[ERROR] mysql_stmt_prepare() failed: %s\n",
-              mysql_stmt_error(stmt));
+        log_error("[ERROR] mysql_stmt_prepare() failed: %s",
+                  mysql_stmt_error(stmt));
+        exit(EXIT_FAILURE);
     }
 
     MYSQL_BIND bind[1];
@@ -178,20 +190,29 @@ bool userExist(MYSQL* pconn, const char* username) {
     bind[0].buffer_length = strlen(username);
 
     if (mysql_stmt_bind_param(stmt, bind)) {
-        error(1, 0, "[ERROR] mysql_stmt_bind_param() failed: %s\n",
-              mysql_stmt_error(stmt));
+        log_error("[ERROR] mysql_stmt_bind_param() failed: %s",
+                  mysql_stmt_error(stmt));
+        exit(EXIT_FAILURE);
     }
 
+    // 开始事务
+    mysql_query(pconn, "START TRANSACTION");
     if (mysql_stmt_execute(stmt)) {
-        error(1, 0, "[ERROR] mysql_stmt_execute() failed: %s\n",
-              mysql_stmt_error(stmt));
+        // 出错，回滚事务
+        mysql_query(pconn, "ROLLBACK");
+        log_error("[ERROR] mysql_stmt_execute() failed: %s",
+                  mysql_stmt_error(stmt));
+        exit(EXIT_FAILURE);
     }
 
     MYSQL_RES* res = mysql_stmt_result_metadata(stmt);
     if (res == NULL) {
+        log_error("stmt result");
         mysql_stmt_close(stmt);
-        return false;
+        exit(EXIT_FAILURE);
     }
+    // 提交事务
+    mysql_query(pconn, "COMMIT");
 
     int exists = 0;
     MYSQL_BIND res_bind[1];
@@ -202,14 +223,16 @@ bool userExist(MYSQL* pconn, const char* username) {
     res_bind[0].buffer_length = sizeof(int);
 
     if (mysql_stmt_bind_result(stmt, res_bind)) {
-        error(1, 0, "[ERROR] mysql_stmt_bind_result() failed: %s\n",
-              mysql_stmt_error(stmt));
+        log_error("[ERROR] mysql_stmt_bind_result() failed: %s",
+                  mysql_stmt_error(stmt));
+        exit(EXIT_FAILURE);
     }
 
     if (mysql_stmt_fetch(stmt) != 0 &&
         mysql_stmt_fetch(stmt) != MYSQL_NO_DATA) {
-        error(1, 0, "[ERROR] mysql_stmt_fetch() failed: %s\n",
-              mysql_stmt_error(stmt));
+        log_error("[ERROR] mysql_stmt_fetch() failed: %s",
+                  mysql_stmt_error(stmt));
+        exit(EXIT_FAILURE);
     }
 
     mysql_free_result(res);
@@ -219,7 +242,7 @@ bool userExist(MYSQL* pconn, const char* username) {
 }
 
 int userInsert(MYSQL* pconn, const char* username, const char* cryptpasswd,
-               int pwdid) {
+               long long pwdid) {
     const char* query =
         "INSERT INTO nb_usertable (username, cryptpasswd, pwdid) VALUES "
         "(?, ?, ?)";
@@ -227,11 +250,13 @@ int userInsert(MYSQL* pconn, const char* username, const char* cryptpasswd,
 
     if (stmt == NULL) {
         log_error("mysql_stmt_init() failed");
+        exit(EXIT_FAILURE);
     }
 
     if (mysql_stmt_prepare(stmt, query, strlen(query))) {
         log_error("[ERROR] mysql_stmt_prepare() failed: %s",
                   mysql_stmt_error(stmt));
+        exit(EXIT_FAILURE);
     }
 
     MYSQL_BIND bind[3];
@@ -254,19 +279,27 @@ int userInsert(MYSQL* pconn, const char* username, const char* cryptpasswd,
     bind[2].length = NULL;
 
     if (mysql_stmt_bind_param(stmt, bind)) {
-        error(1, 0, "[ERROR] mysql_stmt_bind_param() failed: %s\n",
-              mysql_stmt_error(stmt));
+        log_error("[ERROR] mysql_stmt_bind_param() failed: %s",
+                  mysql_stmt_error(stmt));
+        exit(EXIT_FAILURE);
     }
 
+    // 开始事务
+    mysql_query(pconn, "START TRANSACTION");
     if (mysql_stmt_execute(stmt)) {
-        error(1, 0, "[ERROR] mysql_stmt_execute() failed: %s\n",
-              mysql_stmt_error(stmt));
+        // 出错，回滚事务
+        mysql_query(pconn, "ROLLBACK");
+        log_error("[ERROR] mysql_stmt_execute() failed: %s",
+                  mysql_stmt_error(stmt));
+        exit(EXIT_FAILURE);
     }
+    int uid = mysql_insert_id(pconn);
+    // 提交事务
+    mysql_query(pconn, "COMMIT");
 
     log_info("User [%s] inserted successfully.", username);
     mysql_stmt_close(stmt);
 
-    int uid = mysql_insert_id(pconn);
     return uid;
 }
 
@@ -277,11 +310,17 @@ int userUpdate(MYSQL* pconn, int uid, const char* fieldname,
              "UPDATE nb_usertable SET %s = '%s' WHERE id = %d", fieldname,
              value, uid);
 
+    // 开始事务
+    mysql_query(pconn, "START TRANSACTION");
     int err = mysql_query(pconn, query);
     if (err) {
+        // 出错，回滚事务
+        mysql_query(pconn, "ROLLBACK");
         log_error(mysql_error(pconn));
         return -1;
     }
+    // 提交事务
+
 
     // 检查是否成功更新
     if (mysql_affected_rows(pconn) == 0) {
@@ -289,6 +328,7 @@ int userUpdate(MYSQL* pconn, int uid, const char* fieldname,
                  fieldname);
         return 1;
     }
+        mysql_query(pconn, "COMMIT");
 
     return 0;
 }
