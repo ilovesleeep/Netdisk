@@ -718,115 +718,20 @@ void mkdirCmd(Task* task) {
     return;
 }
 
-static void getSetting(char* setting, char* passwd) {
-    int i, j;
-    // 取出salt,i 记录密码字符下标，j记录$出现次数
-    for (i = 0, j = 0; passwd[i] && j != 4; ++i) {
-        if (passwd[i] == '$') ++j;
-    }
-    strncpy(setting, passwd, i);
-}
-
 void loginCheck1(Task* task) {
-    printf("[INFO] loginCheck1 start\n");
+    log_debug("loginCheck1 start");
     log_info("user to login: [%s]", task->args[1]);
 
-    struct spwd* sp = getspnam(task->args[1]);
+    char* username = task->args[1];
 
-    // 0: 存在, 1: 不存在
-    // 暂时先用数字，后面用 enum
-    int user_stat = 0;
-    if (sp == NULL) {
-        // 用户不存在
-        user_stat = 1;
-        sendn(task->fd, &user_stat, sizeof(int));
-        return;
-    }
-
-    // 用户存在
-    sendn(task->fd, &user_stat, sizeof(int));
-    WorkDir* wd = task->wd_table[task->fd];
-    // 更新 path
-    bzero(wd->path, MAXLINE);
-    sprintf(wd->path, "user/%s", task->args[1]);
-    // 为用户创建家目录
-    mkdir(wd->path, 0777);
-    // 更新 index
-    wd->index[1] = strlen(wd->path) - 1;
-
-    // 保存用户名
-    strcpy(wd->name, task->args[1]);
-
-    char setting[128] = {0};
-    // 保存加密密文
-    strcpy(wd->encrypted, sp->sp_pwdp);
-    // 提取 setting
-    getSetting(setting, sp->sp_pwdp);
-
-    int setting_len = strlen(setting);
-    sendn(task->fd, &setting_len, sizeof(int));
-    sendn(task->fd, setting, setting_len);
-
-    printf("[INFO] loginCheck1 end\n");
-    return;
-}
-
-void loginCheck2(Task* task) {
-    printf("[INFO] loginCheck2 start\n");
-
-    // printf("[INFO] user passwd: <%s>\n", task->args[1]);
-
-    int user_stat = 0;
-    WorkDir* wd = task->wd_table[task->fd];
-
-    if (strcmp(wd->encrypted, task->args[1]) == 0) {
-        // 登录成功
-        sendn(task->fd, &user_stat, sizeof(int));
-        log_info("[%s] login successfully", wd->name);
-    } else {
-        // 登录失败，密码错误
-        user_stat = 1;
-        sendn(task->fd, &user_stat, sizeof(int));
-        log_warn("[%s] login failed", wd->name);
-    }
-
-    printf("[INFO] loginCheck2 end\n");
-    return;
-}
-
-static void generateSalt();
-
-void regCheck1(Task* task) {
-    printf("[INFO] regCheck1 start\n");
-    log_info("user to register: [%s]", task->args[1]);
-
-    //___________________________________________
-    // 查数据库，用户名是否存在
-    MYSQL* pconn = getDBConnection(task->dbpool);
-
-    char sql[] = "SELECT * FROM t_user_0614 WHERE id > 0";
-    int err = mysql_query(pconn, sql);
-    if (err) {
-        error(1, 0, "[ERROR] (%d, %s)\n", mysql_errno(pconn),
-              mysql_error(pconn));
-    }
-
-    MYSQL_RES* res = mysql_store_result(pconn);
-    printf("rows: %llu\n", mysql_num_rows(res));
-
-    MYSQL_ROW row;
-    while ((row = mysql_fetch_row(res)) != NULL) {
-        int num_fields = mysql_num_fields(res);
-        for (int i = 0; i < num_fields; ++i) {
-            printf("%s\t", row[i]);
-        }
-        putchar('\n');
-    }
-    /*
-    //___________________________________________
-    // 0: 用户名可用, 1: 用户名不可用
+    // 0：成功，1：失败
     int status_code = 0;
-    if (sp == NULL) {
+    MYSQL* pconn = getDBConnection(task->dbpool);
+    int exist = userExist(pconn, username);
+    log_info("[%s] exist = [%d]", task->args[1], exist);
+
+    if (exist == 0) {
+        releaseDBConnection(task->dbpool, pconn);
         // 用户不存在
         status_code = 1;
         sendn(task->fd, &status_code, sizeof(int));
@@ -835,53 +740,112 @@ void regCheck1(Task* task) {
 
     // 用户存在
     sendn(task->fd, &status_code, sizeof(int));
-    WorkDir* wd = task->wd_table[task->fd];
-    // 更新 path
-    bzero(wd->path, MAXLINE);
-    sprintf(wd->path, "user/%s", task->args[1]);
-    // 为用户创建家目录
-    mkdir(wd->path, 0777);
-    // 更新 index
-    wd->index[1] = strlen(wd->path) - 1;
 
-    // 保存用户名
-    strcpy(wd->name, task->args[1]);
+    // 获取 uid
+    int uid = getUserIDByUsername(pconn, username);
+    printf("get [%s] uid = %d\n", username, uid);
 
-    char setting[128] = {0};
-    // 保存加密密文
-    strcpy(wd->encrypted, sp->sp_pwdp);
-    // 提取 setting
-    getSetting(setting, sp->sp_pwdp);
+    // 查询 salt
+    char* salt = getSaltByUID(pconn, uid);
+    releaseDBConnection(task->dbpool, pconn);
 
-    int setting_len = strlen(setting);
-    sendn(task->fd, &setting_len, sizeof(int));
-    sendn(task->fd, setting, setting_len);
+    // 发送 salt
+    int salt_len = strlen(salt);
+    sendn(task->fd, &salt_len, sizeof(int));
+    sendn(task->fd, salt, salt_len);
+    free(salt);
 
-    printf("[INFO] loginCheck1 end\n");
-    */
+    // 更新本地 user_table
+    // 如果用户没到 check2，会在 say goodbye 时处理
+    task->u_table[task->fd] = uid;
+
+    log_debug("loginCheck1 end");
+    return;
+}
+
+void loginCheck2(Task* task) {
+    log_debug("loginCheck2 start");
+
+    // args[1] = u_cryptpasswd
+    char* u_cryptpasswd = task->args[1];
+    int uid = task->u_table[task->fd];
+
+    // 查询数据库中的 cryptpasswd
+    MYSQL* pconn = getDBConnection(task->dbpool);
+    char* cryptpasswd = getCryptpasswdByUID(pconn, uid);
+    releaseDBConnection(task->dbpool, pconn);
+
+    int status_code = 0;
+    if (strcmp(u_cryptpasswd, cryptpasswd) == 0) {
+        // 登录成功
+        sendn(task->fd, &status_code, sizeof(int));
+        log_info("[uid=%d] login successfully", uid);
+    } else {
+        // 登录失败，密码错误
+        status_code = 1;
+        sendn(task->fd, &status_code, sizeof(int));
+        log_warn("[%d] login failed", uid);
+    }
+
+    log_debug("loginCheck2 end");
+    return;
+}
+
+void regCheck1(Task* task) {
+    log_debug("regCheck1 start");
+    log_info("user to register: [%s]", task->args[1]);
+
+    char* username = task->args[1];
+    // 查数据库，用户名是否可用
+    // 0: 用户名可用, 1: 用户名已存在
+    int status_code = 0;
+    MYSQL* pconn = getDBConnection(task->dbpool);
+    if (userExist(pconn, username)) {
+        releaseDBConnection(task->dbpool, pconn);
+        status_code = 1;
+        sendn(task->fd, &status_code, sizeof(int));
+        return;
+    }
+    releaseDBConnection(task->dbpool, pconn);
+
+    // 可以注册
+    sendn(task->fd, &status_code, sizeof(int));
+    // 生成 salt
+    char* salt = generateSalt();
+    // 发送 salt
+    int salt_len = strlen(salt);
+    sendn(task->fd, &salt_len, sizeof(int));
+    sendn(task->fd, salt, salt_len);
+    free(salt);
+
+    log_debug("regCheck1 end");
+
     return;
 }
 
 void regCheck2(Task* task) {
-    printf("[INFO] loginCheck2 start\n");
+    log_debug("regCheck2 start");
 
-    // printf("[INFO] user passwd: <%s>\n", task->args[1]);
+    // args[1] = username
+    // args[2] = salt
+    // args[3] = cryptpasswd
 
-    int user_stat = 0;
-    WorkDir* wd = task->wd_table[task->fd];
+    char* username = task->args[1];
+    char* salt = task->args[2];
+    char* cryptpasswd = task->args[3];
 
-    if (strcmp(wd->encrypted, task->args[1]) == 0) {
-        // 登录成功
-        sendn(task->fd, &user_stat, sizeof(int));
-        log_info("[%s] login successfully", wd->name);
-    } else {
-        // 登录失败，密码错误
-        user_stat = 1;
-        sendn(task->fd, &user_stat, sizeof(int));
-        log_warn("[%s] login failed", wd->name);
-    }
+    MYSQL* pconn = getDBConnection(task->dbpool);
+    int pwdid = 0;
+    // insertRecord(); 获取 pwdid
+    int uid = userInsert(pconn, username, salt, cryptpasswd, pwdid);
+    releaseDBConnection(task->dbpool, pconn);
 
-    printf("[INFO] loginCheck2 end\n");
+    // 0: 注册成功
+    int status_code = 0;
+    sendn(task->fd, &status_code, sizeof(int));
+    log_info("[%s] register successfully", username);
+
+    log_debug("regCheck2 end");
     return;
 }
 
