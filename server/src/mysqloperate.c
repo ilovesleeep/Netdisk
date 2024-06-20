@@ -90,7 +90,7 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* path) {
         MYSQL_BIND res_bind[2];
 
         bind[0].buffer_type = MYSQL_TYPE_LONG;
-        bind[0].buffer = &pwd;
+        bind[0].buffer = &retval;
         bind[0].buffer_length = sizeof(int);
 
         char res_type = '\0';
