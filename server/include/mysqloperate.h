@@ -4,7 +4,7 @@
 #include <mysql/field_types.h>
 #include <mysql/mysql.h>
 int getPwdId(MYSQL* mysql, int uid);
-char* getPwd(MYSQL* mysql, int pwdid);
+int getPwd(MYSQL* mysql, int pwdid, char* path, int path_size);
 int goToRelativeDir(MYSQL* mysql, int pwd, char* path);
 char** findchild(MYSQL*mysql, int pwdid);
 #endif;
