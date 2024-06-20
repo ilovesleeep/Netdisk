@@ -22,6 +22,7 @@ static void exitHandler(int signo) {
 }
 
 int serverMain(ServerConfig* conf, HashTable* ht) {
+#if 0
     pipe(g_exit_pipe);
     pid_t pid = fork();
     switch (pid) {
@@ -44,7 +45,7 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
     // 子进程
     log_info("%d Kirov process reporting", getpid());
     close(g_exit_pipe[1]);
-
+#endif
     // epoll
     int epfd = epoll_create(1);
 
