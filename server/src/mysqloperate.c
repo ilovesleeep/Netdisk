@@ -19,8 +19,9 @@ int getPwdId(MYSQL* mysql, int uid) {
     return pwdid;
 }
 
-// 根据当前路径和传入参数找到目标路径,传入当前路径索引和**文件名**,传出目标路径索引,传出若路径不存在则返回-1
-int goToRelativeDir(MYSQL* mysql, int pwd, char* path) {
+// 根据当前路径和传入参数找到目标路径,传入当前路径索引和**文件名**,传出目标路径索引,传出若路径不存在则返回-1,
+// type为传出参数,传出目标索引对应的文件类型'd'f',若传参为NULL则不返回
+int goToRelativeDir(MYSQL* mysql, int pwd, char* path, char* type) {
     int retval = 0;
     if (strcmp(path, "..") == 0) {
 
@@ -36,7 +37,8 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* path) {
 
     } else if (strcmp(path, "~") == 0) {
         // 查找家目录
-        while ((pwd = goToRelativeDir(mysql, pwd, "..")) != -1) {
+
+        while ((pwd = goToRelativeDir(mysql, pwd, "..", NULL)) != -1) {
 
             retval = pwd;
         }
@@ -92,8 +94,10 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* path) {
         if (ret == 1 || ret == MYSQL_NO_DATA) {
             fprintf(stderr, "%s", mysql_error(mysql));
             retval = -1;
-        } else if (res_type == 'F') {
-            retval = -1;
+        }
+
+        if (type != NULL) {
+            *type = res_type;
         }
         // type为'D'时retval已完成赋值,直接返回即可
     }
