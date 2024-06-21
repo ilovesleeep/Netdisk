@@ -313,14 +313,7 @@ void lsCmd(int sockfd) {
 }
 
 void rmCmd(int sockfd, char* buf) {
-    // 客户端接收响应
-    char data[2] = "1";
-    int res_len;
-    recvn(sockfd, &res_len, sizeof(int));
-    Command cmd;
-    recvn(sockfd, &cmd, sizeof(Command));
-    recvn(sockfd, data, 1);
-
+    
     int recv_stat = 0;
     recv(sockfd, &recv_stat, sizeof(int),MSG_NOSIGNAL);
 
