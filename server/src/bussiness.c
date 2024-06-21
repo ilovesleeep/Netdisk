@@ -380,8 +380,7 @@ void lsCmd(Task* task) {
     return;
 }
 
-int delFileOrDir(int pwdid) {
-    MYSQL* mysql;
+int delFileOrDir(MYSQL *mysql,int pwdid) {
     // 通过set exist='0'删除文件或目录
     char sql[60] = {0};
     sprintf(sql, "update nb_vftable set exist='0' where id=%d", pwdid);
@@ -395,12 +394,11 @@ int delFileOrDir(int pwdid) {
 }
 
 // 传入uid,pwdid,name,type,判断传入的是文件还是目录
-int rmCmdHelper(int uid, int pwdid, char* name, char type) {
-    MYSQL* mysql;
+int rmCmdHelper(MYSQL *mysql,int uid, int pwdid, char* name, char type) {
     // 获取类型
     if (type == 'f') {
         // 类型为file,直接删除
-        int res = delFileOrDir(pwdid);
+        int res = delFileOrDir(mysql,pwdid);
         if (res != 0) {
             log_error("del failed.");
             error(1, 0, "[ERROR] del failed\n");
@@ -413,7 +411,7 @@ int rmCmdHelper(int uid, int pwdid, char* name, char type) {
         while (*child != NULL) {
             int childpwdid = getPwdId(mysql, uid);
             char type = getTypeById(mysql, childpwdid);
-            int res = rmCmdHelper(uid, childpwdid, *child, type);
+            int res = rmCmdHelper(mysql,uid, childpwdid, *child, type);
             if (res != 0) {
                 log_error("del failed.");
                 error(1, 0, "[ERROR] del failed\n");
@@ -422,7 +420,7 @@ int rmCmdHelper(int uid, int pwdid, char* name, char type) {
         }
     }
 
-    int res = delFileOrDir(pwdid);
+    int res = delFileOrDir(mysql,pwdid);
     if (res != 0) {
         log_error("del failed.");
         error(1, 0, "[ERROR] del failed\n");
@@ -465,13 +463,13 @@ void rmCmd(Task* task) {
         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
     }
 
-    MYSQL* mysql;
+    MYSQL* mysql = getDBConnection(task->dbpool);
     int pwdid = getPwdId(mysql, task->uid);
     char pwd[1024] = {0};
     getPwd(mysql, pwdid, pwd, 1024);
     char type = getTypeById(mysql, pwdid);
 
-    int res = rmCmdHelper(task->uid, pwdid, pwd, type);
+    int res = rmCmdHelper(mysql,task->uid, pwdid, pwd, type);
     if (res != 0) {
         // 错误，未能成功删除
         int send_stat = 1;
@@ -481,13 +479,17 @@ void rmCmd(Task* task) {
         send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
         send(task->fd, error_info, info_len, MSG_NOSIGNAL);
         log_error("rm %s failed.", pwd);
+        releaseDBConnection(task->dbpool,mysql);
         error(1, 0, "[ERROR] rm failed\n");
+    } else {
     } else {
         // 成功删除
         int send_stat = 0;
         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
     }
 
+    releaseDBConnection(task->dbpool,mysql);
     return;
 }
 
