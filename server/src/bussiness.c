@@ -147,7 +147,7 @@ int sendFile(int sockfd, int fd, off_t f_size) {
 int recvFile(int sockfd, MYSQL* mysql, int u_id) {
     int p_id = getPwdId(mysql, u_id);
     char path[1024] = {0}; 
-    getPwd(mysql, p_id, path);
+    getPwd(mysql, p_id, path, 1024);
     // 接收文件名
     DataBlock block;
     bzero(&block, sizeof(block));
