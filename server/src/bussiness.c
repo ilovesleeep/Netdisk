@@ -13,11 +13,6 @@
 #define BIGFILE_SIZE (100 * 1024 * 1024)
 #define MMAPSIZE (1024 * 1024)
 
-typedef struct {
-    int length;
-    char data[BUFSIZE];
-} DataBlock;
-
 int sendn(int fd, void* buf, int length) {
     int bytes = 0;
     while (bytes < length) {
@@ -268,8 +263,7 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
     return 0;
 }
 
-int cdCmd(Task* task) {
-    // 告知客户端，接受当前命令的响应
+static int touchClient(Task* task) {
     char data[2] = "1";
     int res_len = sizeof(Command) + 1;
     sendn(task->fd, &res_len, sizeof(int));
@@ -279,13 +273,49 @@ int cdCmd(Task* task) {
     return 0;
 }
 
+int cdCmd(Task* task) {
+    // 告知客户端，接受当前命令的响应
+    touchClient(task);
+
+    int status_code = 0;
+    char res[MAXLINE] = {0};
+    int uid = task->uid;
+
+    // 检查参数个数是否合法
+    if (task->args[2] != NULL) {
+        // 不合法
+        status_code = 1;
+        sendn(task->fd, &status_code, sizeof(int));
+        strcpy(res, "Parameter at most 1");
+        sendn(task->fd, res, strlen(res));
+        return -1;
+    }
+
+    // 没有参数，回到家目录
+    if (task->args[1] == NULL) {
+        sendn(task->fd, &status_code, sizeof(int));
+        // 获取 uid 家目录 id
+        //
+        // 更新 usertable pwdid
+        //
+        strcpy(res, "/");
+        sendn(task->fd, res, strlen(res));
+        return 0;
+    }
+
+    // 检查目标目录是否存在
+    //
+    // 存在，更新 usertable 的 pwdid
+    // userUpdate();
+    //
+    // 发给客户端目标目录的 path
+
+    return 0;
+}
+
 void lsCmd(Task* task) {
     // 告知客户端，接收当前命令的响应
-    char data[2] = "1";
-    int res_len = sizeof(Command) + 1;
-    sendn(task->fd, &res_len, sizeof(int));
-    sendn(task->fd, &task->cmd, sizeof(Command));
-    sendn(task->fd, data, 1);
+    touchClient(task);
 
     // bufsize = 4096
     char result[BUFSIZE] = {0};
@@ -317,10 +347,7 @@ void lsCmd(Task* task) {
             family++;
         }
 
-        for (int i = 0; family[i] != NULL; ++i) {
-            free(family);
-        }
-        free(family);
+        freeStringArray(family);
         // 发送（大火车）
         int info_len = strlen(result);
         send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
@@ -383,11 +410,7 @@ int rmCmdHelper(int uid, int pwdid, char* name, char type) {
 
 void rmCmd(Task* task) {
     // 告知客户端，接受当前命令的响应
-    char data[2] = "1";
-    int res_len = sizeof(Command) + 1;
-    sendn(task->fd, &res_len, sizeof(int));
-    sendn(task->fd, &task->cmd, sizeof(Command));
-    sendn(task->fd, data, 1);
+    touchClient(task);
 
     // TODO:
     // 删除文件及目录。
@@ -408,7 +431,7 @@ void rmCmd(Task* task) {
     } else if (task->args[2] != NULL) {
         int send_stat = 1;
         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-        char error_info[] = "no such parameter";
+        char error_info[] = "rm: 参数太多";
         int info_len = strlen(error_info);
         send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
         send(task->fd, error_info, info_len, MSG_NOSIGNAL);
@@ -447,11 +470,7 @@ void rmCmd(Task* task) {
 
 void pwdCmd(Task* task) {
     // 告知客户端，接受当前命令的响应
-    char data[2] = "1";
-    int res_len = sizeof(Command) + 1;
-    sendn(task->fd, &res_len, sizeof(int));
-    sendn(task->fd, &task->cmd, sizeof(Command));
-    sendn(task->fd, data, 1);
+    touchClient(task);
 
     char path[MAXLINE] = {0};
     int path_size = MAXLINE;
@@ -522,7 +541,7 @@ int getsCmd(Task* task) {
                     char type;
                     target_pwdid =
                         goToRelativeDir(mysql, target_pwdid, file_name, &type);
-                    if (type == 'D') {
+                    if (type == 'd') {
                         // 最后文件名对应的是一个路径,本网盘暂不支持传输文件夹功能
                         //***消息对接***
                         int send_stat = 1;
@@ -541,11 +560,13 @@ int getsCmd(Task* task) {
                 }
             }
         }
-        // 此时file_name即文件名,target_pwdid为待插入项的id
+        // 此时file_name即文件名,target_pwdid为待发送的id
         // 检查文件是否完整(不用检查了,我只会将完整的文件目录项设为1)
-
-        char* path_file = NULL;
-        int fd = open(path_file, O_RDWR);
+        off_t f_size;
+        off_t c_size;
+        char f_hash[17] = {0};
+        getFileInfo(mysql, target_pwdid, f_hash, &f_size, &c_size);
+        int fd = open(f_hash, O_RDWR);
         // 检查文件是否存在
         // 不存在
         if (fd == -1) {
@@ -615,12 +636,9 @@ int putsCmd(Task* task) {
 
 void mkdirCmd(Task* task) {
     // 告知客户端，接受当前命令的响应
-    char data[2] = "1";
-    int res_len = sizeof(Command) + 1;
-    sendn(task->fd, &res_len, sizeof(int));
-    sendn(task->fd, &task->cmd, sizeof(Command));
-    sendn(task->fd, data, 1);
+    touchClient(task);
 
+    int res_len = 0;
     if (task->args[0] == NULL || task->args[1] != NULL) {  // missing operand
         char errmsg[MAXLINE] = "mkdir: missing operand";
         res_len = strlen(errmsg);
@@ -872,7 +890,7 @@ int taskHandler(Task* task) {
             lsCmd(task);
             break;
         case CMD_RM:
-            // rmCmd(task);
+            rmCmd(task);
             break;
         case CMD_PWD:
             pwdCmd(task);
@@ -903,33 +921,4 @@ int taskHandler(Task* task) {
             break;
     }
     return retval;
-}
-
-void taskFree(Task* task) {
-    for (int i = 0; task->args[i] != NULL; ++i) {
-        free(task->args[i]);
-    }
-    free(task->args);
-    free(task);
-    // task->wd_table 在客户端断开时 free
-}
-
-void workdirInit(WorkDir** workdir_table, int connfd, char* username) {
-    // TODO: error checking
-    workdir_table[connfd] = (WorkDir*)malloc(sizeof(WorkDir));
-    workdir_table[connfd]->path = (char*)malloc(MAXLINE * sizeof(char));
-    workdir_table[connfd]->index = (int*)malloc(MAXLINE * sizeof(int));
-
-    strcpy(workdir_table[connfd]->path, username);
-    workdir_table[connfd]->index[0] = 1;
-    workdir_table[connfd]->index[1] = strlen(username) - 1;
-
-    strcpy(workdir_table[connfd]->name, "");
-    strcpy(workdir_table[connfd]->encrypted, "");
-}
-
-void workdirFree(WorkDir* workdir) {
-    free(workdir->path);
-    free(workdir->index);
-    free(workdir);
 }

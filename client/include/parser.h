@@ -21,6 +21,7 @@ typedef enum {
 } Command;
 
 char** parseRequest(const char* req);
+
 void freeStringArray(char** array);
 
 Command getCommand(const char* cmd);
