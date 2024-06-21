@@ -3,6 +3,7 @@
 #define MAXLINE 1024
 #define BUFSIZE 1024
 #define MAX_NAME_LENGTH 20
+#define MAX_HOST_LENGTH 64
 #define NUM_THREADS 4
 #define MAXEVENTS 1024
 
@@ -168,18 +169,29 @@ void printMenu(void) {
         "                                        \n");
 }
 
+char g_user[MAX_NAME_LENGTH + 1] = {0};  // +1 for '\0'
+char g_host[MAX_HOST_LENGTH] = "localhost";
+char g_cwd[MAXLINE] = "~";
+
+static void printPrompt(void) {
+    printf("\033[32m[%s@%s]:\033[33m%s\033[0m$ ", g_user, g_host, g_cwd);
+    fflush(stdout);
+}
+
 int main(int argc, char* argv[]) {
     if (argc != 3) {
         error(1, 0, "Usage: %s [host] [port]\n", argv[0]);
     }
+
+    // 初始化客户端日志
+    initLog();
 
     // 连接主服务器(调度)
     int sockfd = tcpConnect(argv[1], argv[2]);
 
     // 欢迎用户
     printMenu();
-    char user[MAX_NAME_LENGTH + 1] = {0};
-    welcome(sockfd, user);
+    welcome(sockfd, g_user);
 
     // 创建 epoll
     int epfd = epoll_create(1);
@@ -195,9 +207,11 @@ int main(int argc, char* argv[]) {
         (struct epoll_event*)calloc(MAXEVENTS, sizeof(struct epoll_event));
 
     // 打印提示符
-    char cwd[MAXLINE] = "~";
-    printf("\033[32m[%s@%s]:\033[33m%s\033[0m$ ", user, argv[1], cwd);
-    fflush(stdout);
+    strncpy(g_host, argv[1], MAX_HOST_LENGTH);
+    printPrompt();
+
+    // 将 STDIN_FILENO 加入 epoll
+    epollAdd(epfd, STDIN_FILENO);
 
     // 主循环
     while (1) {
@@ -206,6 +220,7 @@ int main(int argc, char* argv[]) {
         for (int i = 0; i < nready; i++) {
             if (ready_events[i].data.fd == STDIN_FILENO) {
                 // 读入请求
+                log_debug("stdin");
                 char buf[BUFSIZE] = {0};
                 int buf_len = read(STDIN_FILENO, buf, BUFSIZE);
                 buf[--buf_len] = '\0';  // -1 for '\n'
@@ -240,10 +255,6 @@ int main(int argc, char* argv[]) {
                 // 处理调度服务器响应
                 responseHandler(sockfd, pool);
 
-                printf("\033[32m[%s@%s]:\033[33m%s\033[0m$ ", user, argv[1],
-                       cwd);
-                fflush(stdout);
-
             } else {
                 // 其他
                 log_debug("other socket");
@@ -262,14 +273,34 @@ Task* getNewConnectionTask(Command cmd, char* res_data) {
 
     // info[0] token, info[1]: host, info[2]: port
     char** info = getNewConnectionInfo(res_data);
-    //
+
     Task* task = (Task*)malloc(sizeof(Task));
     task->cmd = cmd;
-    task->token = info[0];
-    task->host = info[1];
-    task->port = info[2];
+    task->token = strdup(info[0]);
+    task->host = strdup(info[1]);
+    task->port = strdup(info[2]);
+
+    freeStringArray(info);
 
     return task;
+}
+
+int shortResponseHandler(int sockfd, Command cmd) {
+    char buf[BUFSIZE] = {0};
+    switch (cmd) {
+        case CMD_CD:
+            return cdCmd(sockfd, buf, g_cwd);
+        case CMD_LS:
+            return lsCmd(sockfd);
+        case CMD_RM:
+            return rmCmd(sockfd, buf);
+        case CMD_PWD:
+            return pwdCmd(sockfd);
+        case CMD_MKDIR:
+            return mkdirCmd(sockfd, buf);
+        default:
+            return -1;
+    }
 }
 
 int responseHandler(int sockfd, ThreadPool* pool) {
@@ -295,16 +326,15 @@ int responseHandler(int sockfd, ThreadPool* pool) {
                     blockqPush(pool->task_queue, task);
                     break;
                 case CMD_CD:
-                    return 0;
                 case CMD_LS:
-                    return 0;
                 case CMD_RM:
-                    return 0;
                 case CMD_PWD:
-                    return 0;
                 case CMD_MKDIR:
+                    shortResponseHandler(sockfd, cmd);
+                    printPrompt();
                     return 0;
                 default:
+                    printPrompt();
                     return 0;
             }
             // 只有长命令才能走到这里

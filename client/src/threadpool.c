@@ -26,6 +26,7 @@ void* eventLoop(void* arg) {
         } else {
             // getsHandler(task);
         }
+        freeTask(task);
 
         log_debug("%lu Ura! Waiting orders.\n", tid);
     }
