@@ -634,19 +634,6 @@ int getsCmd(Task* task) {
         char f_hash[17] = {0};
         getFileInfo(mysql, target_pwdid, f_hash, &f_size, &c_size);
         int fd = open(f_hash, O_RDWR);
-        // 检查文件是否存在
-        // 不存在
-        if (fd == -1) {
-            int send_stat = 1;
-            send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-
-            char error_info[1000] = {0};
-            sprintf(error_info, "%s%d", "no such file : file number : ", i);
-            int info_len = strlen(error_info);
-            send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-            send(task->fd, error_info, info_len, MSG_NOSIGNAL);
-            return 0;
-        }
         // 存在
         int send_stat = 0;
         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
@@ -678,7 +665,6 @@ int putsCmd(Task* task) {
     int recv_stat = 0;
     send(task->fd, &recv_stat, sizeof(int), MSG_NOSIGNAL);
 
-    MYSQL* mysql = getDBConnection(task->dbpool);
     int retval = 0;
     for (int i = 0; true; i++) {
         // 先接收是否要发送
