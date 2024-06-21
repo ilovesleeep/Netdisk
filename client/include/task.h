@@ -17,6 +17,10 @@ typedef struct {
     // int splice_size;   // 文件切片大小
 } Task;
 
+char** getNewConnectionInfo(char* res_data);
+
+Task* getNewConnectionTask(Command cmd, char* res_data);
+
 void freeTask(Task* task);
 
 #endif

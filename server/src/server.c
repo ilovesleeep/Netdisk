@@ -100,10 +100,15 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
     pthread_t monitor_dbpool;
     pthread_create(&monitor_dbpool, NULL, monitorDBPool, dbpool);
 
-    // 监听端口
+    // 控制命令端口
     int listenfd = tcpListen(conf->port);
     epollAdd(epfd, listenfd);
 
+    // 数据传输端口
+    int datafd = tcpListen("30002");
+    epollAdd(epfd, datafd);
+
+    // 就绪事件
     struct epoll_event* ready_events =
         (struct epoll_event*)calloc(MAXEVENTS, sizeof(struct epoll_event));
 
@@ -126,6 +131,10 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
                 // 添加到 epoll
                 epollAdd(epfd, connfd);
                 epollMod(epfd, connfd, EPOLLIN | EPOLLONESHOT);
+
+            } else if (ready_events[i].data.fd == datafd) {
+                // GETS, PUTS
+                //
 
             } else if (ready_events[i].data.fd == g_exit_pipe[0]) {
                 // 父进程传来退出信号

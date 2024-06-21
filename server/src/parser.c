@@ -59,14 +59,12 @@ char** getArgs(const char* req) {
 }
 
 void freeStringArray(char** array) {
-    log_debug("free begin");
     if (array == NULL) return;
 
     for (int i = 0; array[i] != NULL; ++i) {
         free(array[i]);
     }
     free(array);
-    log_debug("free end");
 }
 
 Command getCommand(const char* cmd) {
