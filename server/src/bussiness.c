@@ -366,7 +366,7 @@ void lsCmd(Task* task) {
 
         while (*p != NULL) {
             strncat(result, *p, sizeof(result) - strlen(*p) - 1);
-            strncat(result, "\t", sizeof(result) - strlen("\t"));
+            strncat(result, "\t", sizeof(result) - strlen("\t") - 1);
             p++;
         }
         freeStringArray(family);
