@@ -402,6 +402,18 @@ void pwdCmd(Task* task) {
     sendn(task->fd, &task->cmd, sizeof(Command));
     sendn(task->fd, data, 1);
 
+    MYSQL* mysql = getDBConnection(task->dbpool);
+    int pwdid = getPwdId(mysql, task->uid);
+
+    char path[MAXLINE] = {0};
+    int path_size = MAXLINE;
+
+    getPwd(mysql, pwdid, path, path_size);
+
+    sendn(task->fd, path, path_size);
+
+    log_debug("pwd: %s", path);
+
     return;
 }
 
@@ -762,7 +774,7 @@ int taskHandler(Task* task) {
             lsCmd(task);
             break;
         case CMD_RM:
-            rmCmd(task);
+            // rmCmd(task);
             break;
         case CMD_PWD:
             pwdCmd(task);

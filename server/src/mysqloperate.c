@@ -81,7 +81,6 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* name, char* type) {
         if (res == NULL) {
             return -1;
         }
-
         // 初始化结果绑定参数
         MYSQL_BIND res_bind[2];
 
@@ -154,16 +153,13 @@ int getPwd(MYSQL* mysql, int pwdid, char* path, int path_size) {
 
     // 先获取field字段
     MYSQL_RES* res = mysql_stmt_result_metadata(stmt);
-    if (res) {
-        return -1;
-    }
 
     // 设置输出参数
     MYSQL_BIND res_bind;
     bzero(&res_bind, sizeof(res_bind));
 
     // 绑定输出参数
-    res_bind.buffer_type = MYSQL_TYPE_STRING;
+    res_bind.buffer_type = MYSQL_TYPE_VAR_STRING;
     res_bind.buffer = path;
     res_bind.buffer_length = path_size;
 
@@ -172,6 +168,18 @@ int getPwd(MYSQL* mysql, int pwdid, char* path, int path_size) {
 
     // 再获取数据信息
     mysql_stmt_store_result(stmt);
+
+    // 真正获取数据时，不是用MYSQL_RES来操作了
+    while (1) {
+        // 每当调用一次mysql_stmt_fetch函数
+        // res_bind中的绑定的字段就会被填充
+        int status = mysql_stmt_fetch(stmt);
+        if (status == 1 || status == MYSQL_NO_DATA) {
+            break;
+        }
+        // 打印一行数据
+        log_debug("path: %s", path);
+    }
 
     mysql_stmt_free_result(stmt);
     mysql_stmt_close(stmt);
