@@ -41,9 +41,7 @@ char** getArgs(const char* req) {
         int token_len = strlen(token);
         args[i] = (char*)calloc((token_len + 1), sizeof(char));  // +1 for '\0'
         if (args[i] == NULL) {
-            while (i > 0) {
-                free(args[--i]);
-            }
+            freeStringArray(args);
             free(args);
             free(tmp);
             log_error("malloc: %s", strerror(errno));
@@ -58,6 +56,15 @@ char** getArgs(const char* req) {
     // 安全考虑，防止越界
     args[MAXARGS - 1] = NULL;
     return args;
+}
+
+void freeStringArray(char** array) {
+    if (array == NULL) return;
+
+    for (int i = 0; array[i] != NULL; ++i) {
+        free(array[i]);
+    }
+    free(array);
 }
 
 Command getCommand(const char* cmd) {

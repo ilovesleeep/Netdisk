@@ -16,15 +16,15 @@ char* generateSalt(void) {
     for (i = 3; i < salt_len; ++i) {
         flag = rand() % 3;
         switch (flag) {
-        case 0:
-            salt[i] = rand() % 26 + 'a';
-            break;
-        case 1:
-            salt[i] = rand() % 26 + 'A';
-            break;
-        case 2:
-            salt[i] = rand() % 10 + '0';
-            break;
+            case 0:
+                salt[i] = rand() % 26 + 'a';
+                break;
+            case 1:
+                salt[i] = rand() % 26 + 'A';
+                break;
+            case 2:
+                salt[i] = rand() % 10 + '0';
+                break;
         }
     }
     salt[salt_len - 1] = '$';
@@ -320,9 +320,10 @@ int userUpdate(MYSQL* pconn, int uid, const char* fieldname,
         return -1;
     }
 
-
     // 检查是否成功更新
     if (mysql_affected_rows(pconn) == 0) {
+        // 出错，回滚事务
+        mysql_query(pconn, "ROLLBACK");
         log_warn("No rows updated when update uid[%d] at field[%s]", uid,
                  fieldname);
         return 1;
