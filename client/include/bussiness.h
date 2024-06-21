@@ -22,8 +22,8 @@ void freeTask(Task* task);
 int sendn(int sockfd, void* buf, int length);
 int recvn(int sockfd, void* buf, int length);
 
-void sendFile(int sockfd, int fd);
-void recvFile(int sockfd);
+int sendFile(int sockfd, int fd);
+int recvFile(int sockfd);
 
 int cdCmd(int sockfd, char* buf, char* cwd);
 int lsCmd(int sockfd);

@@ -41,7 +41,7 @@ int recvn(int fd, void* buf, int length) {
     return 0;
 }
 
-void sendFile(int sockfd, int fd) {
+int sendFile(int sockfd, int fd) {
     // 发送文件大小
     struct stat statbuf;
     fstat(fd, &statbuf);
@@ -50,58 +50,55 @@ void sendFile(int sockfd, int fd) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
-    // 接收客户端对本文件是否存在过的确认及哈希值
-    // 收到客户端是否存在过的确认，若存在则检查哈希值，若不存在则直接发送
-    int recv_stat = 0;
-    recv(sockfd, &recv_stat, sizeof(int), MSG_WAITALL);
-
-    off_t send_bytes = 0;
-    if (recv_stat == 1) {
-        // 文件存在过,检查哈希值
-        // 先看看他有多大的文件
-        recvn(sockfd, &send_bytes, sizeof(send_bytes));
-        unsigned char md5sum_client[16];
-        recvn(sockfd, md5sum_client, sizeof(md5sum_client));
-        if (send_bytes > statbuf.st_size) {
-            // 我服务器的文件都没那么大,你哪来那么大,我给你重发一个
-            send_bytes = 0;
+    // 计算自己的哈希值(不可能有文件空洞)
+    unsigned char md5sum_client[16];
+    MD5_CTX ctx;
+    MD5_Init(&ctx);
+    for (off_t curr = 0; curr < statbuf.st_size; curr += MMAPSIZE) {
+        if (curr + MMAPSIZE <= statbuf.st_size) {
+            char* p = mmap(NULL, MMAPSIZE, PROT_READ | PROT_WRITE, MAP_SHARED,
+                           fd, curr);
+            MD5_Update(&ctx, p, MMAPSIZE);
+            munmap(p, MMAPSIZE);
         } else {
-            // 先根据收到的文件大小计算自己的哈希值(服务器的文件不可能有文件空洞)
-            MD5_CTX ctx;
-            MD5_Init(&ctx);
-            for (off_t curr = 0; curr < send_bytes; curr += MMAPSIZE) {
-                if (curr + MMAPSIZE <= send_bytes) {
-                    char* p = mmap(NULL, MMAPSIZE, PROT_READ | PROT_WRITE,
-                                   MAP_SHARED, fd, curr);
-                    MD5_Update(&ctx, p, MMAPSIZE);
-                    munmap(p, MMAPSIZE);
-                } else {
-                    int surplus = send_bytes - curr;
-                    char* p = mmap(NULL, surplus, PROT_READ | PROT_WRITE,
-                                   MAP_SHARED, fd, curr);
-                    MD5_Update(&ctx, p, surplus);
-                    munmap(p, surplus);
-                    break;
-                }
-            }
-            // 生成MD5值
-            unsigned char md5sum[16];
-            MD5_Final(md5sum, &ctx);
-
-            // 比较
-            if (memcmp(md5sum_client, md5sum, sizeof(md5sum)) == 0) {
-                // 是一个文件(＾－＾),继续发送叭
-                int send_stat = 0;
-                sendn(sockfd, &send_stat, sizeof(int));
-            } else {
-                // 不是一个文件,重新来过吧
-                int send_stat = 1;
-                sendn(sockfd, &send_stat, sizeof(int));
-                send_bytes = 0;
-            }
+            int surplus = statbuf.st_size - curr;
+            char* p = mmap(NULL, surplus, PROT_READ | PROT_WRITE, MAP_SHARED,
+                           fd, curr);
+            MD5_Update(&ctx, p, surplus);
+            munmap(p, surplus);
+            break;
         }
     }
+    // 生成MD5值
+    unsigned char md5sum[16];
+    MD5_Final(md5sum, &ctx);
+
+    // 发送哈希值
+    send(sockfd, md5sum, sizeof(md5sum), MSG_NOSIGNAL);
 #pragma GCC diagnostic pop
+
+    // 服务端是否允许发送
+    int recv_stat = 0;
+    recv(sockfd, &recv_stat, sizeof(int), MSG_NOSIGNAL);
+    if (recv_stat == 1) {
+        // 不允许发送,接收错误原因
+        int info_len = 0;
+        recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
+        char recv_info[100] = {0};
+        recv(sockfd, recv_info, sizeof(recv_info), MSG_WAITALL);
+        puts(recv_info);
+    }
+
+    // 接收是否已完成秒传
+    recv(sockfd, &recv_stat, sizeof(int), MSG_NOSIGNAL);
+    if (recv_stat == 0) {
+        // 已存在该文件,可以秒传
+        return 0;
+    }
+
+    // 接收服务端希望从哪里开始发
+    off_t send_bytes = 0;
+    recv(sockfd, &send_bytes, sizeof(off_t), MSG_WAITALL);
     // 此时send_bytes对应正确的开始发送位置
 
     // 发送文件内容
@@ -132,9 +129,14 @@ void sendFile(int sockfd, int fd) {
         }
     }
     close(fd);
+    return 0;
 }
 
-void recvFile(int sockfd) {
+int recvFile(int sockfd) {
+    // 先接收哈希值和文件大小
+    char f_hash[16] = {0};
+    recvn(sockfd, f_hash, 32);
+    off_t f_size = 0;
     // 接收文件名
     DataBlock block;
     bzero(&block, sizeof(block));
@@ -147,21 +149,18 @@ void recvFile(int sockfd) {
         error(1, errno, "open");
     }
 
-    // 接收文件的大小
-    off_t fsize;
-    recvn(sockfd, &fsize, sizeof(fsize));
-    off_t recv_bytes = 0;
-
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
     // 检查0为没有存在过,1为存在过
     struct stat statbuf;
     fstat(fd, &statbuf);
-    if (statbuf.st_size < MMAPSIZE) {
+    off_t recv_bytes = 0;
+    if (statbuf.st_size < MMAPSIZE || statbuf.st_size > f_size) {
         // 没有存在过(小于MMAPSIZE都当没存在过处理,不差那1M流量,懒得再算哈希值)
-        int send_stat = 0;
-        send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+        int send_stat = 1;
+        sendn(sockfd, &send_stat, sizeof(int));
+        sendn(sockfd, &recv_bytes, sizeof(off_t));
     } else {
         // 存在过,检查哈希值,检查哈希值全部以MMAPSIZE为单位来查找
         int send_stat = 1;
@@ -223,28 +222,33 @@ void recvFile(int sockfd) {
         unsigned char md5sum[16];
         MD5_Final(md5sum, &ctx);
         // 发送文件实际大小及哈希值
-        sendn(sockfd, &recv_bytes, sizeof(recv_bytes));
-        sendn(sockfd, md5sum, sizeof(md5sum));
-
-        // 看看文件是不是一样的呀
-        int recv_stat = 0;
-        recvn(sockfd, &recv_stat, sizeof(int));
-        if (recv_stat == 1) {
-            // 糟糕!文件不一样
-            recv_bytes = 0;
+        // 若哈希值相等
+        if (memcmp(md5sum, f_hash, 16) == 0) {
+            int send_stat = 0;
+            sendn(sockfd, &send_stat, sizeof(int));
+            close(fd);
+            return 0;
         }
-        // 文件一样,recv_bytes指向的是开始接收的位置
+        // 若不等,则发送哈希值
+        else {
+            int send_stat = 1;
+            sendn(sockfd, &send_stat, sizeof(int));
+            sendn(sockfd, &recv_bytes, sizeof(recv_bytes));
+            sendn(sockfd, md5sum, sizeof(md5sum));
+        }
     }
 #pragma GCC diagnostic pop
+    // 接收从哪里开始发
+    recvn(sockfd, &recv_bytes, sizeof(off_t));
     // 此时recv_bytes对应正确的开始接收位置
     //  接收文件内容
-    if (fsize >= BIGFILE_SIZE) {
-        ftruncate(fd, fsize);
+    if (f_size >= BIGFILE_SIZE) {
+        ftruncate(fd, f_size);
         // 大文件
-        while (recv_bytes < fsize) {
-            off_t length = (fsize - recv_bytes >= MMAPSIZE)
+        while (recv_bytes < f_size) {
+            off_t length = (f_size - recv_bytes >= MMAPSIZE)
                                ? MMAPSIZE
-                               : fsize - recv_bytes;
+                               : f_size - recv_bytes;
             void* addr = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED,
                               fd, recv_bytes);
             recvn(sockfd, addr, length);
@@ -252,25 +256,29 @@ void recvFile(int sockfd) {
 
             recv_bytes += length;
 
-            printf("[INFO] downloading %5.2lf%%\r", 100.0 * recv_bytes / fsize);
+            printf("[INFO] downloading %5.2lf%%\r",
+                   100.0 * recv_bytes / f_size);
             fflush(stdout);
         }
     } else {
         char buf[BUFSIZE];
-        while (recv_bytes < fsize) {
-            off_t length =
-                (fsize - recv_bytes >= BUFSIZE) ? BUFSIZE : fsize - recv_bytes;
+        while (recv_bytes < f_size) {
+            off_t length = (f_size - recv_bytes >= BUFSIZE)
+                               ? BUFSIZE
+                               : f_size - recv_bytes;
             recvn(sockfd, buf, length);
             write(fd, buf, length);
 
             recv_bytes += length;
 
-            printf("[INFO] downloading %5.2lf%%\r", 100.0 * recv_bytes / fsize);
+            printf("[INFO] downloading %5.2lf%%\r",
+                   100.0 * recv_bytes / f_size);
             fflush(stdout);
         }
     }
     printf("[INFO] downloading %5.2lf%%\n", 100.0);
     close(fd);
+    return 0;
 }
 
 int cdCmd(int sockfd, char* buf, char* cwd) {
@@ -289,17 +297,17 @@ int cdCmd(int sockfd, char* buf, char* cwd) {
 
 int lsCmd(int sockfd) {
     // 参数校验
-    int recv_stat = 0;
-    recv(sockfd, &recv_stat, sizeof(int), MSG_WAITALL);
+    // int recv_stat = 0;
+    // recv(sockfd, &recv_stat, sizeof(int), MSG_WAITALL);
     // 错误处理
-    if (recv_stat == 1) {
-        int info_len = 0;
-        recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
-        char error_info[1000] = {0};
-        recv(sockfd, error_info, info_len, MSG_WAITALL);
-        puts(error_info);
-        return -1;
-    }
+    // if (recv_stat == 1) {
+    //     int info_len = 0;
+    //     char error_info[1000] = {0};
+    //     recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
+    //     recv(sockfd, error_info, info_len, MSG_WAITALL);
+    //     puts(error_info);
+    //     return;
+    // }
 
     // 接收函数，大火车
     int name_len = 0;
@@ -314,9 +322,9 @@ int lsCmd(int sockfd) {
 
 int rmCmd(int sockfd, char* buf) {
     int recv_stat = 0;
-    recvn(sockfd, &recv_stat, sizeof(int));
+    recv(sockfd, &recv_stat, sizeof(int), MSG_NOSIGNAL);
 
-    // 错误处理
+    // 参数校验的错误处理
     if (recv_stat == 1) {
         int info_len = 0;
         recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
@@ -326,9 +334,8 @@ int rmCmd(int sockfd, char* buf) {
         return -1;
     }
 
-    // 参数正确
-    recv_stat = 0;
     recv(sockfd, &recv_stat, sizeof(int), MSG_NOSIGNAL);
+
     // 错误处理
     if (recv_stat != 0) {
         int info_len = 0;
@@ -421,7 +428,7 @@ int putsCmd(int sockfd, char** args) {
             }  //*p == '\0' || *p == '/'
         }
 
-        // 先发文件名
+        // 文件名
         DataBlock block;
         strcpy(block.data, filename);
         block.length = strlen(filename);
