@@ -28,7 +28,7 @@ char getTypeById(MYSQL *mysql,int id){
     MYSQL_RES* res = mysql_store_result(mysql);
     MYSQL_ROW row;
     row = mysql_fetch_row(res);
-    Type = row[0];
+    Type = row[0][0];
     mysql_free_result(res);
 
     return Type;
