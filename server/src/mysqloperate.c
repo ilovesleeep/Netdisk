@@ -335,4 +335,6 @@ int updateRecord(MYSQL* mysql, int pwdid, const int* p_id, const int* u_id, cons
         }
     }
     sprintf(sql, "%s%s%d", sql, "WHERE id = ", pwdid);
+    mysql_query(mysql, sql);
+    return 0;
 }
