@@ -19,11 +19,11 @@ int getPwdId(MYSQL* mysql, int uid) {
     return pwdid;
 }
 
-// 根据传入的id，返回文件的类型
+// 根据传入的目录id，返回文件的类型
 char getTypeById(MYSQL *mysql,int id){
     char Type;
     char sql[60] ={};
-    sprintf(sql,"select Type from vftable where id=%d",id);
+    sprintf(sql,"select Type from nb_vftable where id=%d",id);
     mysql_query(mysql,sql);
     MYSQL_RES* res = mysql_store_result(mysql);
     MYSQL_ROW row;

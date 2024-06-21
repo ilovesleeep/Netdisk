@@ -9,6 +9,7 @@
 
 int getPwdId(MYSQL* mysql, int uid);
 char* getPwd(MYSQL* mysql, int pwdid);
+char getTypeById(MYSQL *mysql,int id);
 int goToRelativeDir(MYSQL* mysql, int pwdid, char* name,char *type);
 char** findchild(MYSQL* mysql, int pwdid);
 int insertRecord(MYSQL* mysql, int p_id, int u_id, char* f_hash, char* name,
