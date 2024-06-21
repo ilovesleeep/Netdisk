@@ -16,15 +16,15 @@ char* generateSalt(void) {
     for (i = 3; i < salt_len; ++i) {
         flag = rand() % 3;
         switch (flag) {
-        case 0:
-            salt[i] = rand() % 26 + 'a';
-            break;
-        case 1:
-            salt[i] = rand() % 26 + 'A';
-            break;
-        case 2:
-            salt[i] = rand() % 10 + '0';
-            break;
+            case 0:
+                salt[i] = rand() % 26 + 'a';
+                break;
+            case 1:
+                salt[i] = rand() % 26 + 'A';
+                break;
+            case 2:
+                salt[i] = rand() % 10 + '0';
+                break;
         }
     }
     salt[salt_len - 1] = '$';
@@ -320,9 +320,10 @@ int userUpdate(MYSQL* pconn, int uid, const char* fieldname,
         return -1;
     }
 
-
     // 检查是否成功更新
     if (mysql_affected_rows(pconn) == 0) {
+        // 出错，回滚事务
+        mysql_query(pconn, "ROLLBACK");
         log_warn("No rows updated when update uid[%d] at field[%s]", uid,
                  fieldname);
         return 1;
@@ -331,4 +332,154 @@ int userUpdate(MYSQL* pconn, int uid, const char* fieldname,
     mysql_query(pconn, "COMMIT");
 
     return 0;
+}
+
+void loginCheck1(Task* task) {
+    log_debug("loginCheck1 start");
+    log_info("user to login: [%s]", task->args[1]);
+
+    char* username = task->args[1];
+
+    // 0：成功，1：失败
+    int status_code = 0;
+    MYSQL* pconn = getDBConnection(task->dbpool);
+    int exist = userExist(pconn, username);
+    log_info("[%s] exist = [%d]", task->args[1], exist);
+
+    if (exist == 0) {
+        releaseDBConnection(task->dbpool, pconn);
+        // 用户不存在
+        status_code = 1;
+        sendn(task->fd, &status_code, sizeof(int));
+        return;
+    }
+
+    // 用户存在
+    sendn(task->fd, &status_code, sizeof(int));
+
+    // 获取 uid
+    int uid = getUserIDByUsername(pconn, username);
+
+    // 查询 cryptpasswd
+    char* cryptpasswd = getCryptpasswdByUID(pconn, uid);
+    releaseDBConnection(task->dbpool, pconn);
+
+    // 提取 salt
+    char salt[16] = {0};
+    getSaltByCryptPasswd(salt, cryptpasswd);
+    free(cryptpasswd);
+
+    // 发送 salt
+    int salt_len = strlen(salt);
+    sendn(task->fd, &salt_len, sizeof(int));
+    sendn(task->fd, salt, salt_len);
+
+    // 更新本地 user_table
+    // 如果用户没到 check2，会在 say goodbye 时处理
+    task->u_table[task->fd] = uid;
+
+    log_debug("loginCheck1 end");
+    return;
+}
+
+void loginCheck2(Task* task) {
+    log_debug("loginCheck2 start");
+
+    // args[1] = u_cryptpasswd
+    char* u_cryptpasswd = task->args[1];
+    int uid = task->u_table[task->fd];
+
+    // 查询数据库中的 cryptpasswd
+    MYSQL* pconn = getDBConnection(task->dbpool);
+    char* cryptpasswd = getCryptpasswdByUID(pconn, uid);
+    releaseDBConnection(task->dbpool, pconn);
+
+    int status_code = 0;
+    if (strcmp(u_cryptpasswd, cryptpasswd) == 0) {
+        // 登录成功
+        sendn(task->fd, &status_code, sizeof(int));
+        log_info("[uid=%d] login successfully", uid);
+    } else {
+        // 登录失败，密码错误
+        status_code = 1;
+        sendn(task->fd, &status_code, sizeof(int));
+        log_warn("[%d] login failed", uid);
+    }
+
+    log_debug("loginCheck2 end");
+    return;
+}
+
+void regCheck1(Task* task) {
+    log_debug("regCheck1 start");
+    log_info("user to register: [%s]", task->args[1]);
+
+    char* username = task->args[1];
+    // 查数据库，用户名是否可用
+    // 0: 用户名可用, 1: 用户名已存在
+    int status_code = 0;
+    MYSQL* pconn = getDBConnection(task->dbpool);
+    if (userExist(pconn, username)) {
+        releaseDBConnection(task->dbpool, pconn);
+        status_code = 1;
+        sendn(task->fd, &status_code, sizeof(int));
+        return;
+    }
+    releaseDBConnection(task->dbpool, pconn);
+
+    // 可以注册
+    sendn(task->fd, &status_code, sizeof(int));
+    // 生成 salt
+    char* salt = generateSalt();
+    // 发送 salt
+    int salt_len = strlen(salt);
+    sendn(task->fd, &salt_len, sizeof(int));
+    sendn(task->fd, salt, salt_len);
+    free(salt);
+
+    log_debug("regCheck1 end");
+
+    return;
+}
+
+void regCheck2(Task* task) {
+    log_debug("regCheck2 start");
+
+    // args[1] = username
+    // args[2] = cryptpasswd
+
+    char* username = task->args[1];
+    char* cryptpasswd = task->args[2];
+
+    MYSQL* pconn = getDBConnection(task->dbpool);
+
+    long long pwdid = 0;
+    int uid = userInsert(pconn, username, cryptpasswd, pwdid);
+
+    // 插入用户目录记录到 nb_vftable
+    pwdid = insertRecord(pconn, -1, uid, NULL, "home", "/home", 'd', NULL, NULL,
+                         '1');
+    if (pwdid == -1) {
+        log_error("insertRecord failed");
+        exit(EXIT_FAILURE);
+    }
+    char pwdid_str[64] = {0};
+    sprintf(pwdid_str, "%lld", pwdid);
+
+    // 更新用户的 pwdid
+    int err = userUpdate(pconn, uid, "pwdid", pwdid_str);
+    if (err) {
+        log_error("userUpdate failed");
+        exit(EXIT_FAILURE);
+    }
+
+    releaseDBConnection(task->dbpool, pconn);
+
+    // 0: 注册成功
+    int status_code = 0;
+    sendn(task->fd, &status_code, sizeof(int));
+    log_info("[%s] register successfully", username);
+
+    log_debug("regCheck2 end");
+    return;
 }
