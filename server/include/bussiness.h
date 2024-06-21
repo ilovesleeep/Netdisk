@@ -38,7 +38,8 @@ int recvFile(int sockfd, char* path);
 
 int cdCmd(Task* task);
 void lsCmd(Task* task);
-int deleteDir(int id,char *type);
+int delFileOrDir(int pwdid);
+int rmCmdHelper(int uid,int pwdid,char *name,char type);
 void rmCmd(Task* task);
 void pwdCmd(Task* task);
 int getsCmd(Task* task);
