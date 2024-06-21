@@ -294,6 +294,12 @@ int cdCmd(int sockfd, char* cwd) {
         printf("Error: %s\n", buf);
         return -1;
     }
+    else{
+        int pwd_len = 0;
+        bzero(cwd, MAXLINE);
+        recv(sockfd, &pwd_len, sizeof(int), MSG_WAITALL);
+        recv(sockfd, cwd, pwd_len, MSG_WAITALL);
+    }
     return 0;
 }
 
@@ -431,7 +437,7 @@ int putsCmd(int sockfd, char** args) {
     return 0;
 }
 
-void mkdirCmd(int sockfd) {
+int mkdirCmd(int sockfd) {
     // 接收函数，大火车
     int name_len = 0;
     // bufsize = 4096;
@@ -442,5 +448,5 @@ void mkdirCmd(int sockfd) {
         printf("%s\n", filename);
     }
     
-    return;
+    return 0;
 }

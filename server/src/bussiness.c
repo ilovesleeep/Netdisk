@@ -239,6 +239,7 @@ static int touchClient(Task* task) {
 }
 
 int cdCmd(Task* task) {
+    touchClient(task);
     char** parameter = task->args;
     if( parameter[2] != NULL){
         //ls不允许多余参数,直接报错
@@ -260,6 +261,12 @@ int cdCmd(Task* task) {
         userUpdate(mysql, task->uid, "pwdid", t);
         int send_stat = 0;
         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+
+        char pwd[10] = {0}; 
+        getPwd(mysql, pwdid, pwd, sizeof(pwd));
+        int pwd_len = strlen(pwd);
+        send(task->fd, &pwd_len, sizeof(int), MSG_NOSIGNAL);
+        send(task->fd, pwd, pwd_len, MSG_NOSIGNAL);
         releaseDBConnection(task->dbpool, mysql);
         return 0;
     }
@@ -310,6 +317,12 @@ int cdCmd(Task* task) {
                     else{
                         int send_stat = 0;
                         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+
+                        char pwd[1024] = {0}; 
+                        getPwd(mysql, pwdid, pwd, sizeof(pwd));
+                        int pwd_len = strlen(pwd);
+                        send(task->fd, &pwd_len, sizeof(int), MSG_NOSIGNAL);
+                        send(task->fd, pwd, pwd_len, MSG_NOSIGNAL);
                     }
                     releaseDBConnection(task->dbpool, mysql);
                     return 0;
