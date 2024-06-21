@@ -689,7 +689,18 @@ void mkdirCmd(Task* task) {
     MYSQL* mysql = getDBConnection(task->dbpool);
     int pwdid = getPwdId(mysql, task->uid);            // pwdid
     char* mkdir_name = task->args[0];                  // name
-    char* pwd = getPwd();                         // 当前目录的绝对路径
+
+    char pwd[1024] = {0};                              // 当前目录的绝对路径
+    if (getPwd(mysql, pwdid, pwd, 1024) == -1) {
+        releaseDBConnection(task->dbpool, mysql);
+        char* errmsg = "mkdir: getPwd failed";
+        res_len = strlen(errmsg);
+        send(task->fd, &res_len, sizeof(int), MSG_NOSIGNAL);
+        send(task->fd, errmsg, res_len, MSG_NOSIGNAL);
+        log_error("%s",errmsg);
+        return;
+    }
+
     char* absolute_path[1024] = {0};              // 绝对路径
     sprintf(absolute_path, "%s/%s", pwd, mkdir_name);
     char* type = "d";  // 类型
