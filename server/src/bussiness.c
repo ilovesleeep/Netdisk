@@ -437,7 +437,7 @@ int delFileOrDir(int pwdid) {
 int rmCmdHelper(int uid, int pwdid, char* name, char type) {
     MYSQL* mysql;
     // 获取类型
-    if (strcmp(type, 'f') == 0) {
+    if (type == 'f') {
         // 类型为file,直接删除
         int res = delFileOrDir(pwdid);
         if (res != 0) {
@@ -445,7 +445,7 @@ int rmCmdHelper(int uid, int pwdid, char* name, char type) {
             error(1, 0, "[ERROR] del failed\n");
         }
         return 0;
-    } else if (strcmp(type, 'd') == 0) {
+    } else if (type == 'd') {
         // 类型是directory,看看是否存在子目录
         char** child = findchild(mysql, pwdid);
 
