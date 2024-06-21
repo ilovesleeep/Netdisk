@@ -13,11 +13,6 @@
 #define BIGFILE_SIZE (100 * 1024 * 1024)
 #define MMAPSIZE (1024 * 1024)
 
-typedef struct {
-    int length;
-    char data[BUFSIZE];
-} DataBlock;
-
 int sendn(int fd, void* buf, int length) {
     int bytes = 0;
     while (bytes < length) {
@@ -55,20 +50,19 @@ int recvn(int fd, void* buf, int length) {
 }
 
 int sendFile(int sockfd, int fd, off_t f_size) {
-
     // 接收客户端想从哪里开始发
     int recv_stat = 0;
     recvn(sockfd, &recv_stat, sizeof(int));
-    if(recv_stat == 0){
+    if (recv_stat == 0) {
         close(fd);
         return 0;
     }
 
     off_t send_bytes = 0;
     recv(sockfd, &send_bytes, sizeof(off_t), MSG_WAITALL);
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-    if(send_bytes != 0){
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    if (send_bytes != 0) {
         unsigned char md5sum_client[16];
         recvn(sockfd, md5sum_client, sizeof(md5sum_client));
         // 先根据收到的文件大小计算自己的哈希值(服务器的文件不可能有文件空洞)
@@ -77,13 +71,13 @@ int sendFile(int sockfd, int fd, off_t f_size) {
         for (off_t curr = 0; curr < send_bytes; curr += MMAPSIZE) {
             if (curr + MMAPSIZE <= send_bytes) {
                 char* p = mmap(NULL, MMAPSIZE, PROT_READ | PROT_WRITE,
-                            MAP_SHARED, fd, curr);
+                               MAP_SHARED, fd, curr);
                 MD5_Update(&ctx, p, MMAPSIZE);
                 munmap(p, MMAPSIZE);
             } else {
                 int surplus = send_bytes - curr;
                 char* p = mmap(NULL, surplus, PROT_READ | PROT_WRITE,
-                            MAP_SHARED, fd, curr);
+                               MAP_SHARED, fd, curr);
                 MD5_Update(&ctx, p, surplus);
                 munmap(p, surplus);
                 break;
@@ -103,7 +97,7 @@ int sendFile(int sockfd, int fd, off_t f_size) {
         }
     }
 
-    #pragma GCC diagnostic pop
+#pragma GCC diagnostic pop
     // 此时send_bytes对应正确的开始发送位置
     // 告诉客户端正确发送位置
     sendn(sockfd, &send_bytes, sizeof(off_t));
@@ -111,8 +105,9 @@ int sendFile(int sockfd, int fd, off_t f_size) {
     if (f_size >= BIGFILE_SIZE) {
         // 大文件
         while (send_bytes < f_size) {
-            off_t length =
-                f_size - send_bytes >= MMAPSIZE ? MMAPSIZE : f_size - send_bytes;
+            off_t length = f_size - send_bytes >= MMAPSIZE
+                               ? MMAPSIZE
+                               : f_size - send_bytes;
 
             void* addr =
                 mmap(NULL, length, PROT_READ, MAP_SHARED, fd, send_bytes);
@@ -147,7 +142,7 @@ int sendFile(int sockfd, int fd, off_t f_size) {
 
 int recvFile(int sockfd, MYSQL* mysql, int u_id) {
     int p_id = getPwdId(mysql, u_id);
-    char path[1024] = {0}; 
+    char path[1024] = {0};
     getPwd(mysql, p_id, path, 1024);
     // 接收文件名
     DataBlock block;
@@ -164,7 +159,7 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
     unsigned char recv_hash[17] = {0};
     recvn(sockfd, recv_hash, sizeof(recv_hash));
 
-    //查看是否有同名文件
+    // 查看是否有同名文件
     char type = '\0';
     int file_id = goToRelativeDir(mysql, p_id, block.data, &type);
     if((file_id != 0 && type == 'd') || file_id > 0){
@@ -177,46 +172,45 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
         send(sockfd, send_info, info_len, MSG_NOSIGNAL);
         return 0;
     }
-    if(file_id < 0 && type == 'f'){
-        //修改目录项
+    if (file_id < 0 && type == 'f') {
+        // 修改目录项
         file_id = -file_id;
-        updateRecord(mysql, file_id, NULL, NULL, recv_hash, NULL, NULL, NULL, NULL);
+        updateRecord(mysql, file_id, NULL, NULL, (const char*)recv_hash, NULL,
+                     NULL, NULL, NULL);
         int send_stat = 1;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-    }
-    else{
+    } else {
         off_t c_size = 0;
-        file_id = insertRecord(mysql, p_id, u_id, recv_hash, block.data, path, 'f', &fsize, &c_size, '0');
+        file_id = insertRecord(mysql, p_id, u_id, (char*)recv_hash, block.data,
+                               path, 'f', &fsize, &c_size, '0');
         int send_stat = 1;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
     }
-
-
 
     // 查表查看是否文件存在(f_hash)(是否可以续传)
     off_t f_size, c_size;
-    localFile(mysql, recv_hash, &f_size, &c_size);
-    if(c_size == f_size && f_size != 0){
-        //文件已存在且完整
+    localFile(mysql, (char*)recv_hash, &f_size, &c_size);
+    if (c_size == f_size && f_size != 0) {
+        // 文件已存在且完整
         int send_stat = 0;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-        
-        updateRecord(mysql, file_id, NULL, NULL, recv_hash, NULL, &f_size, &c_size, "1");
+
+        updateRecord(mysql, file_id, NULL, NULL, (const char*)recv_hash, NULL,
+                     &f_size, &c_size, "1");
         return 0;
-    }
-    else{
-        //文件存在但不完整或文件不存在
+    } else {
+        // 文件存在但不完整或文件不存在
         int send_stat = 1;
-        if(send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL) == -1){
+        if (send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL) == -1) {
             return 1;
         }
     }
-    //发送服务器准备从哪里开始接收
-    if(send(sockfd, &c_size, sizeof(off_t), MSG_NOSIGNAL) == -1){
+    // 发送服务器准备从哪里开始接收
+    if (send(sockfd, &c_size, sizeof(off_t), MSG_NOSIGNAL) == -1) {
         return 1;
     }
     // 打开文件
-    int fd = open(recv_hash, O_RDWR | O_CREAT, 0666);
+    int fd = open((const char*)recv_hash, O_RDWR | O_CREAT, 0666);
     if (fd == -1) {
         error(1, errno, "open");
     }
@@ -235,7 +229,8 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
             if (recvn(sockfd, addr, length) == -1) {
                 close(fd);
                 munmap(addr, length);
-                updateRecord(mysql, file_id, NULL, NULL, NULL, NULL, NULL, &recv_bytes, NULL);
+                updateRecord(mysql, file_id, NULL, NULL, NULL, NULL, NULL,
+                             &recv_bytes, NULL);
                 return 1;
             }
             munmap(addr, length);
@@ -252,7 +247,8 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
                 (fsize - recv_bytes >= BUFSIZE) ? BUFSIZE : fsize - recv_bytes;
             if (recvn(sockfd, buf, length) == -1) {
                 close(fd);
-                updateRecord(mysql, file_id, NULL, NULL, NULL, NULL, NULL, &recv_bytes, NULL);
+                updateRecord(mysql, file_id, NULL, NULL, NULL, NULL, NULL,
+                             &recv_bytes, NULL);
                 return 1;
             }
             write(fd, buf, length);
@@ -265,6 +261,16 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
     }
     printf("[INFO] downloading %5.2lf%%\n", 100.0);
     close(fd);
+    return 0;
+}
+
+static int touchClient(Task* task) {
+    char data[2] = "1";
+    int res_len = sizeof(Command) + 1;
+    sendn(task->fd, &res_len, sizeof(int));
+    sendn(task->fd, &task->cmd, sizeof(Command));
+    sendn(task->fd, data, 1);
+
     return 0;
 }
 
@@ -353,12 +359,8 @@ int cdCmd(Task* task) {
 }
 
 void lsCmd(Task* task) {
-    // char data[2] = "1";
-    // int res_len = sizeof(Command) + 1;
-    // sendn(task->fd, &res_len, sizeof(int));
-    // sendn(task->fd, &task->cmd, sizeof(Command));
-    // sendn(task->fd, data, 1);
-
+    // 告知客户端，接收当前命令的响应
+    touchClient(task);
 
     // bufsize = 4096
     char result[BUFSIZE] = {0};
@@ -372,13 +374,13 @@ void lsCmd(Task* task) {
         int info_len = strlen(error_info);
         send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
         send(task->fd, error_info, info_len, MSG_NOSIGNAL);
-        
+
         log_error("lsCmd: parameter number error");
     } else {
         // int sendstat = 0;
         // send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
         // 获取当前路径
-        MYSQL* mysql = getDBConnection(task->dbpool); 
+        MYSQL* mysql = getDBConnection(task->dbpool);
         // int pwdid = getPwdId(mysql, task->uid);
         int pwdid = 1;
         char** family = findchild(mysql, pwdid);
@@ -390,16 +392,12 @@ void lsCmd(Task* task) {
             family++;
         }
 
-        for (int i = 0; family[i] != NULL; ++i) {
-            free(family);
-        }
-        free(family);
+        freeStringArray(family);
         // 发送（大火车）
         int info_len = strlen(result);
         send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
         send(task->fd, result, info_len, MSG_NOSIGNAL);
     }
-
 
     return;
 }
@@ -456,18 +454,14 @@ int rmCmdHelper(int uid, int pwdid, char* name, char type) {
 }
 
 void rmCmd(Task* task) {
+    // 告知客户端，接受当前命令的响应
+    touchClient(task);
+
     // TODO:
     // 删除文件及目录。
     // 如果删除的是文件，则直接将它的exist设为“0”。
     // 如果删除的是目录，则需要查看它是否存在子目录。需要遍历父目录id，找到和本目录id相等的行。
     // 并且递归查询下去，直到找到一个目录项不是当前目录id为止，并将它们的exist类型都设置为“0”。
-
-    // 告知客户端接收当前命令的响应
-    // char data[2] = "1";
-    // int res_len = sizeof(Command) + 1;
-    // sendn(task->fd, &res_len, sizeof(int));
-    // sendn(task->fd, &task->cmd, sizeof(Command));
-    // sendn(task->fd, data, 1);
 
     // 参数校验,只接受一个参数。 "usage: rm file/dict."
     if (task->args[1] == NULL) {
@@ -482,7 +476,7 @@ void rmCmd(Task* task) {
     } else if (task->args[2] != NULL) {
         int send_stat = 1;
         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-        char error_info[] = "no such parameter";
+        char error_info[] = "rm: 参数太多";
         int info_len = strlen(error_info);
         send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
         send(task->fd, error_info, info_len, MSG_NOSIGNAL);
@@ -495,49 +489,47 @@ void rmCmd(Task* task) {
 
     MYSQL* mysql;
     int pwdid = getPwdId(mysql, task->uid);
-    char *pwd;
-    getPwd(mysql, pwdid,*pwd,1024);
+    char pwd[1024] = {0};
+    getPwd(mysql, pwdid, pwd, 1024);
     char type = getTypeById(mysql, pwdid);
 
     int res = rmCmdHelper(task->uid, pwdid, pwd, type);
     if (res != 0) {
         // 错误，未能成功删除
         int send_stat = 1;
-        send(task->fd,&send_stat,sizeof(int),MSG_NOSIGNAL);
+        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
         char error_info[] = "rm failed";
         int info_len = strlen(error_info);
-        send(task->fd,&info_len,sizeof(int),MSG_NOSIGNAL);
-        send(task->fd,error_info,info_len,MSG_NOSIGNAL);
-        log_error("rm %s failed.",pwd);
+        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+        send(task->fd, error_info, info_len, MSG_NOSIGNAL);
+        log_error("rm %s failed.", pwd);
         error(1, 0, "[ERROR] rm failed\n");
-    }else{
+    } else {
         // 成功删除
         int send_stat = 0;
-        send(task->fd,&send_stat,sizeof(int),MSG_NOSIGNAL);
+        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
     }
 
     return;
 }
 
 void pwdCmd(Task* task) {
-    
-    //char data[2]="1";
-    //int res_len =sizeof(Command) + 1;
-    //sendn(task->fd,&res_len, sizeof(int));
-    //sendn(task->fd,&task->cmd,sizeof(Command));
-    //sendn(task->fd, data, 1);
+    // 告知客户端，接受当前命令的响应
+    touchClient(task);
 
-    MYSQL* mysql = getDBConnection(task->dbpool);
-    int pwdid = getPwdId(mysql, task->uid);
-    
     char path[MAXLINE] = {0};
     int path_size = MAXLINE;
 
+    MYSQL* mysql = getDBConnection(task->dbpool);
+
+    int pwdid = getPwdId(mysql, task->uid);
     getPwd(mysql, pwdid, path, path_size);
 
+    releaseDBConnection(task->dbpool, mysql);
+
     sendn(task->fd, path, path_size);
-    
-    log_debug("pwd: %s",path);
+
+    log_debug("pwd: %s", path);
 
     return;
 }
@@ -545,7 +537,7 @@ void pwdCmd(Task* task) {
 int getsCmd(Task* task) {
     // 确认参数数量是否正确
     if (task->args[1] == NULL) {
-        //参数错误
+        // 参数错误
         int send_stat = 1;
         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
         char error_info[] = "no such parameter";
@@ -554,7 +546,7 @@ int getsCmd(Task* task) {
         send(task->fd, error_info, info_len, MSG_NOSIGNAL);
         return 0;
     } else {
-        //参数正确
+        // 参数正确
         int send_stat = 0;
         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
     }
@@ -603,7 +595,8 @@ int getsCmd(Task* task) {
                         //***消息对接***
                         int send_stat = 1;
                         sendn(task->fd, &send_stat, sizeof(int));
-                        char send_info[] = "Don't support transmiting directory";
+                        char send_info[] =
+                            "Don't support transmiting directory";
                         int info_len = strlen(send_info);
                         sendn(task->fd, &info_len, sizeof(int));
                         sendn(task->fd, send_info, info_len);
@@ -611,7 +604,7 @@ int getsCmd(Task* task) {
                         releaseDBConnection(task->dbpool, mysql);
                         return 0;
                     }
-                    if (target_pwdid == 0){
+                    if (target_pwdid == 0) {
                         // 目录不存在
                         //***消息对接***
                         int send_stat = 1;
@@ -643,10 +636,10 @@ int getsCmd(Task* task) {
         strcpy(block.data, file_name);
         block.length = strlen(file_name);
         sendn(task->fd, &block, sizeof(int) + block.length);
-        //发送哈希值和文件大小
+        // 发送哈希值和文件大小
         sendn(task->fd, f_hash, 16);
         sendn(task->fd, &f_size, sizeof(off_t));
-        if (sendFile(task->fd, fd, f_size) == 1) {  
+        if (sendFile(task->fd, fd, f_size) == 1) {
             // sendfile中close了fd,若返回值为1证明连接中断,则不进行剩余发送任务
             releaseDBConnection(task->dbpool, mysql);
             return 1;
@@ -695,18 +688,15 @@ int putsCmd(Task* task) {
 }
 
 void mkdirCmd(Task* task) {
-    char data[2] = "1";
-    int res_len = sizeof(Command) + 1;
-    sendn(task->fd, &res_len, sizeof(int));
-    sendn(task->fd, &task->cmd, sizeof(Command));
-    sendn(task->fd, data, 1);
+    // 告知客户端，接受当前命令的响应
+    touchClient(task);
 
-
+    int res_len = 0;
     if (task->args[1] == NULL || task->args[2] != NULL) {  // missing operand
         char errmsg[MAXLINE] = "mkdir: missing operand";
         res_len = strlen(errmsg);
         send(task->fd, &res_len, sizeof(int), MSG_NOSIGNAL);
-        
+
         send(task->fd, errmsg, strlen(errmsg), MSG_NOSIGNAL);
         log_error("mkdirCmd: missing operand");
         error(0, errno, "%d mkdir:", task->fd);
@@ -714,40 +704,40 @@ void mkdirCmd(Task* task) {
     }
 
     MYSQL* mysql = getDBConnection(task->dbpool);
-    int pwdid = getPwdId(mysql, task->uid);            // pwdid
-    char* mkdir_name = task->args[1];                  // name
+    int pwdid = getPwdId(mysql, task->uid);  // pwdid
+    char* mkdir_name = task->args[1];        // name
 
-    char pwd[1024] = {0};                              // 当前目录的绝对路径
+    char pwd[1024] = {0};  // 当前目录的绝对路径
     if (getPwd(mysql, pwdid, pwd, 1024) == -1) {
         releaseDBConnection(task->dbpool, mysql);
         char* errmsg = "mkdir: getPwd failed";
         res_len = strlen(errmsg);
         send(task->fd, &res_len, sizeof(int), MSG_NOSIGNAL);
         send(task->fd, errmsg, res_len, MSG_NOSIGNAL);
-        log_error("%s",errmsg);
+        log_error("%s", errmsg);
         return;
     }
 
-    char* absolute_path[1024] = {0};              // 绝对路径
+    char absolute_path[1024] = {0};  // 绝对路径
     sprintf(absolute_path, "%s/%s", pwd, mkdir_name);
-    char type = 'd';  // 类型
+    char type[] = "d";  // 类型
 
     int ret = goToRelativeDir(mysql, pwdid, mkdir_name, type);
     if (ret == 0) {
         // 不存在, insert
-        int insert_ret = insertRecord(mysql, pwdid, task->uid, NULL, mkdir_name, absolute_path, 
-                    'd', NULL, NULL, '1');
+        int insert_ret = insertRecord(mysql, pwdid, task->uid, NULL, mkdir_name,
+                                      absolute_path, 'd', NULL, NULL, '1');
         releaseDBConnection(task->dbpool, mysql);
         if (insert_ret == -1) {
             char* errmsg = "mkdir: insert failed";
             res_len = strlen(errmsg);
             send(task->fd, &res_len, sizeof(int), MSG_NOSIGNAL);
             send(task->fd, errmsg, res_len, MSG_NOSIGNAL);
-            log_error("%s",errmsg);
+            log_error("%s", errmsg);
         } else {
             log_info("mkdir: insert succeed");
         }
-        
+
     } else if (ret > 0) {
         releaseDBConnection(task->dbpool, mysql);
         // 存在，不能创建
@@ -755,12 +745,13 @@ void mkdirCmd(Task* task) {
         res_len = strlen(errmsg);
         send(task->fd, &res_len, sizeof(int), MSG_NOSIGNAL);
         send(task->fd, errmsg, res_len, MSG_NOSIGNAL);
-        log_error("%s",errmsg);
+        log_error("%s", errmsg);
     } else {
-        // ret < 0 
+        // ret < 0
         // 目录项存在，exist = 0
-        if (type == 'd') { // 是目录，exist改为1
-            const char* query_str = "update nb_vftable set exist = 1 where id = ";
+        if (type[0] == 'd') {  // 是目录，exist改为1
+            const char* query_str =
+                "update nb_vftable set exist = 1 where id = ";
             char str[16] = {0};
             sprintf(str, "%d", -ret);
             char query[1024] = {0};
@@ -770,18 +761,18 @@ void mkdirCmd(Task* task) {
             if (update_ret != 0) {
                 log_error("mkdir: mysql_query: %s", strerror(errno));
                 error(1, errno, "mkdir: mysql_query");
-            }else {
+            } else {
                 log_info("mkdir: mysql_query succeed");
             }
-        } else { // 是文件，不能创建
+        } else {  // 是文件，不能创建
             char* errmsg = "mkdir: dirname wrong";
             res_len = strlen(errmsg);
             send(task->fd, &res_len, sizeof(int), MSG_NOSIGNAL);
             send(task->fd, errmsg, res_len, MSG_NOSIGNAL);
-            log_error("%s",errmsg);
+            log_error("%s", errmsg);
         }
         releaseDBConnection(task->dbpool, mysql);
-    } 
+    }
     return;
 }
 
@@ -904,13 +895,12 @@ void regCheck2(Task* task) {
 
     MYSQL* pconn = getDBConnection(task->dbpool);
 
-    // 插入用户记录到 nb_usertable
-
     long long pwdid = 0;
     int uid = userInsert(pconn, username, cryptpasswd, pwdid);
 
     // 插入用户目录记录到 nb_vftable
-    pwdid = insertRecord(pconn, -1, uid, NULL, "home", "/", 'd', NULL, NULL, '1');
+    pwdid =
+        insertRecord(pconn, -1, uid, NULL, "home", "/", 'd', NULL, NULL, '1');
     if (pwdid == -1) {
         log_error("insertRecord failed");
         exit(EXIT_FAILURE);
@@ -952,7 +942,7 @@ int taskHandler(Task* task) {
             lsCmd(task);
             break;
         case CMD_RM:
-            // rmCmd(task);
+            rmCmd(task);
             break;
         case CMD_PWD:
             pwdCmd(task);
@@ -983,33 +973,4 @@ int taskHandler(Task* task) {
             break;
     }
     return retval;
-}
-
-void taskFree(Task* task) {
-    for (int i = 0; task->args[i] != NULL; ++i) {
-        free(task->args[i]);
-    }
-    free(task->args);
-    free(task);
-    // task->wd_table 在客户端断开时 free
-}
-
-void workdirInit(WorkDir** workdir_table, int connfd, char* username) {
-    // TODO: error checking
-    workdir_table[connfd] = (WorkDir*)malloc(sizeof(WorkDir));
-    workdir_table[connfd]->path = (char*)malloc(MAXLINE * sizeof(char));
-    workdir_table[connfd]->index = (int*)malloc(MAXLINE * sizeof(int));
-
-    strcpy(workdir_table[connfd]->path, username);
-    workdir_table[connfd]->index[0] = 1;
-    workdir_table[connfd]->index[1] = strlen(username) - 1;
-
-    strcpy(workdir_table[connfd]->name, "");
-    strcpy(workdir_table[connfd]->encrypted, "");
-}
-
-void workdirFree(WorkDir* workdir) {
-    free(workdir->path);
-    free(workdir->index);
-    free(workdir);
 }
