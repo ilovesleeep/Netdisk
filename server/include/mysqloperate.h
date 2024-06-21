@@ -8,7 +8,7 @@
 #include "head.h"
 
 int getPwdId(MYSQL* mysql, int uid);
-char* getPwd(MYSQL* mysql, int pwdid);
+int getPwd(MYSQL* mysql, int pwdid, char* path, int path_size);
 char getTypeById(MYSQL *mysql,int id);
 int goToRelativeDir(MYSQL* mysql, int pwdid, char* name,char *type);
 char** findchild(MYSQL* mysql, int pwdid);
