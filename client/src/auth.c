@@ -149,7 +149,20 @@ static int userLogin1(int sockfd, char* name, char* salt) {
         printf("login: ");
         fflush(stdout);
         bzero(name, MAX_NAME_LENGTH + 1);
-        int name_len = read(STDIN_FILENO, name, MAX_NAME_LENGTH);
+        int name_len = read(STDIN_FILENO, name, MAX_NAME_LENGTH + 1);
+        if (name_len > MAX_NAME_LENGTH) {
+            printf("Max name length is 20, please re-enter\n");
+            continue;
+        } else if (name_len < 1) {  // name == "\n"
+            printf("Min name length is 1, please re-enter\n");
+            continue;
+        }
+        for (int i = 0; i < name_len; ++i) {
+            if (name[i] == ' ') {
+                printf("Space is not allowed in usrename, please re-enter\n");
+                continue;
+            }
+        }
         name[--name_len] = '\0';
 
         // login1 for section 1
