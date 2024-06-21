@@ -308,7 +308,9 @@ int lsCmd(int sockfd) {
     int buf_len = 0;
 
     recv(sockfd, &buf_len, sizeof(int), MSG_WAITALL);
-    recv(sockfd, buf, buf_len, MSG_WAITALL);
+    if(buf_len != 0){
+        recv(sockfd, buf, buf_len, MSG_WAITALL);
+    }
 
     printf("%s\n", buf);
     return 0;

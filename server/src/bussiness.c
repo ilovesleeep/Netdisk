@@ -256,17 +256,29 @@ int cdCmd(Task* task) {
     if( parameter[1] == NULL){
         //回家
         pwdid = goToRelativeDir(mysql, pwdid, "~", NULL);
+        if(pwdid == 0){
+            int send_stat = 1;
+            send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+            char send_info[] = "you already at home";
+            int info_len = strlen(send_info);
+            send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+            send(task->fd, send_info, info_len, MSG_NOSIGNAL);
+            releaseDBConnection(task->dbpool, mysql);
+            return 0;
+        }
+
         char t[10] = {0};
         sprintf(t, "%d", pwdid);
         userUpdate(mysql, task->uid, "pwdid", t);
+
         int send_stat = 0;
         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-
         char pwd[10] = {0}; 
         getPwd(mysql, pwdid, pwd, sizeof(pwd));
         int pwd_len = strlen(pwd);
         send(task->fd, &pwd_len, sizeof(int), MSG_NOSIGNAL);
         send(task->fd, pwd, pwd_len, MSG_NOSIGNAL);
+        
         releaseDBConnection(task->dbpool, mysql);
         return 0;
     }
