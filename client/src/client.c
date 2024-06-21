@@ -151,7 +151,9 @@ int main(int argc, char* argv[]) {
                 Command cmd = getCommand(args[0]);
                 if (cmd == CMD_UNKNOWN) {
                     // 不响应
+                    log_debug("未知命令，不响应");
                     freeStringArray(args);
+                    printPrompt();
                     continue;
                 } else if (cmd == CMD_EXIT) {
                     // TODO: 退出逻辑
@@ -233,6 +235,7 @@ int responseHandler(int sockfd, ThreadPool* pool) {
         int data_len = res_len - sizeof(cmd);
         ret = recv(sockfd, &cmd, sizeof(cmd), MSG_WAITALL);
         ret = recv(sockfd, res_data, data_len, MSG_WAITALL);
+        log_debug("recv res_data: '%s'", res_data);
 
         if (ret > 0) {  // 接收到了有效响应
             // 分离长短命令, 主线程处理短命令响应
