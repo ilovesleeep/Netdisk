@@ -223,7 +223,7 @@ int responseHandler(int sockfd, ThreadPool* pool) {
         exit(EXIT_FAILURE);
     } else if (ret < 0) {
         // 发生错误
-        log_error("recv: %", strerror(errno));
+        log_error("recv: %s", strerror(errno));
         close(sockfd);
         // 退出
         exit(EXIT_FAILURE);
