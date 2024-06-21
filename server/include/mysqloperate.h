@@ -25,12 +25,5 @@ int getFileInfo(MYSQL* mysql, int pwdid, char* f_hash, off_t* f_size,
                 off_t* c_size);
 
 int localFile(MYSQL* mysql, char* f_hash, off_t* f_size, off_t* c_size);
-
-int fileUpDate(MYSQL* mysql, int pwdid, char* f_hash, off_t f_size,
-               off_t c_size, char exist);
-
-int updateRecord(MYSQL* mysql, int pwdid, const int* p_id, const int* u_id,
-                 const char* f_hash, const char* type, const off_t* f_size,
-                 const off_t* c_size, const char* exist);
-
+int updateRecord(MYSQL* mysql, int pwdid, const int* p_id, const int* u_id, const unsigned char* f_hash, const char* type, const off_t* f_size, const off_t* c_size, const char* exist);
 #endif

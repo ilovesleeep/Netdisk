@@ -287,13 +287,19 @@ int cdCmd(int sockfd, char* cwd) {
     char buf[MAXLINE] = {0};
     recvn(sockfd, &recv_stat, sizeof(int));
     if (recv_stat) {
-        recv(sockfd, buf, MAXLINE, 0);
+        int info_len = 0;
+        recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
+        char buf[MAXLINE] = {0};
+        recv(sockfd, buf, info_len, MSG_WAITALL);
         printf("Error: %s\n", buf);
         return -1;
     }
-
-    bzero(cwd, MAXLINE);
-    recv(sockfd, cwd, MAXLINE, 0);
+    else{
+        int pwd_len = 0;
+        bzero(cwd, MAXLINE);
+        recv(sockfd, &pwd_len, sizeof(int), MSG_WAITALL);
+        recv(sockfd, cwd, pwd_len, MSG_WAITALL);
+    }
     return 0;
 }
 
@@ -302,7 +308,9 @@ int lsCmd(int sockfd) {
     int buf_len = 0;
 
     recv(sockfd, &buf_len, sizeof(int), MSG_WAITALL);
-    recv(sockfd, buf, buf_len, MSG_WAITALL);
+    if(buf_len != 0){
+        recv(sockfd, buf, buf_len, MSG_WAITALL);
+    }
 
     printf("%s\n", buf);
     return 0;
@@ -432,10 +440,15 @@ int putsCmd(int sockfd, char** args) {
 }
 
 int mkdirCmd(int sockfd) {
-    char buf[MAXLINE] = {0};
-    recv(sockfd, buf, MAXLINE, 0);
-    if (strcmp(buf, "0") != 0) {
-        puts(buf);
+    // 接收函数，大火车
+    int name_len = 0;
+    // bufsize = 4096;
+    char filename[BUFSIZE] = {0};
+    recv(sockfd, &name_len, sizeof(int), MSG_WAITALL);
+    if (name_len != 0) {
+        recv(sockfd, filename, name_len, MSG_WAITALL);
+        printf("%s\n", filename);
     }
+    
     return 0;
 }
