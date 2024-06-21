@@ -86,19 +86,19 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* name,char *type) {
         // 初始化结果绑定参数
         MYSQL_BIND res_bind[3];
 
-        bind[0].buffer_type = MYSQL_TYPE_LONG;
-        bind[0].buffer = &retval;
-        bind[0].buffer_length = sizeof(int);
+        res_bind[0].buffer_type = MYSQL_TYPE_LONG;
+        res_bind[0].buffer = &retval;
+        res_bind[0].buffer_length = sizeof(int);
 
         char res_type = '\0';
-        bind[1].buffer_type = MYSQL_TYPE_STRING;
-        bind[1].buffer = &res_type;
-        bind[1].buffer_length = sizeof(res_type);
+        res_bind[1].buffer_type = MYSQL_TYPE_STRING;
+        res_bind[1].buffer = &res_type;
+        res_bind[1].buffer_length = sizeof(res_type);
 
         char res_exist = '\0';
-        bind[2].buffer_type = MYSQL_TYPE_STRING;
-        bind[2].buffer = &res_exist;
-        bind[2].buffer_length = sizeof(res_exist);
+        res_bind[2].buffer_type = MYSQL_TYPE_STRING;
+        res_bind[2].buffer = &res_exist;
+        res_bind[2].buffer_length = sizeof(res_exist);
         ret = mysql_stmt_bind_result(stmt, res_bind);
 
         ret = mysql_stmt_store_result(stmt);
