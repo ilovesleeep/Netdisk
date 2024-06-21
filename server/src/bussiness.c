@@ -13,42 +13,6 @@
 #define BIGFILE_SIZE (100 * 1024 * 1024)
 #define MMAPSIZE (1024 * 1024)
 
-int sendn(int fd, void* buf, int length) {
-    int bytes = 0;
-    while (bytes < length) {
-        int n = send(fd, (char*)buf + bytes, length - bytes, MSG_NOSIGNAL);
-        if (n < 0) {
-            return -1;
-        }
-
-        bytes += n;
-    }  // bytes == length
-
-    return 0;
-}
-
-int recvn(int fd, void* buf, int length) {
-    int i = 0;
-
-    int bytes = 0;
-    while (bytes < length) {
-        int n = recv(fd, (char*)buf + bytes, length - bytes, 0);
-        if (n < 0) {
-            return -1;
-        }
-        if (n == 0) {
-            if (++i ==
-                1000) {  // 如果接收了1000次0长度的信息，那对端一定是关闭了，要么就是网太差，直接踢出去
-                return -1;
-            }
-        }
-
-        bytes += n;
-    }  // bytes == length
-
-    return 0;
-}
-
 int sendFile(int sockfd, int fd, off_t f_size) {
     // 接收客户端想从哪里开始发
     int recv_stat = 0;
@@ -340,15 +304,16 @@ void lsCmd(Task* task) {
         // int pwdid = getPwdId(mysql, task->uid);
         int pwdid = 1;
         char** family = findchild(mysql, pwdid);
+        char** p = family;
         releaseDBConnection(task->dbpool, mysql);
 
-        while (*family != NULL) {
-            strncat(result, *family, sizeof(result) - strlen(*family) - 1);
+        while (*p != NULL) {
+            strncat(result, *p, sizeof(result) - strlen(*p) - 1);
             strncat(result, "\t", sizeof(result) - strlen("\t"));
-            family++;
+            p++;
         }
-
         freeStringArray(family);
+
         // 发送（大火车）
         int info_len = strlen(result);
         send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
@@ -730,161 +695,7 @@ void mkdirCmd(Task* task) {
     return;
 }
 
-void loginCheck1(Task* task) {
-    log_debug("loginCheck1 start");
-    log_info("user to login: [%s]", task->args[1]);
-
-    char* username = task->args[1];
-
-    // 0：成功，1：失败
-    int status_code = 0;
-    MYSQL* pconn = getDBConnection(task->dbpool);
-    int exist = userExist(pconn, username);
-    log_info("[%s] exist = [%d]", task->args[1], exist);
-
-    if (exist == 0) {
-        releaseDBConnection(task->dbpool, pconn);
-        // 用户不存在
-        status_code = 1;
-        sendn(task->fd, &status_code, sizeof(int));
-        return;
-    }
-
-    // 用户存在
-    sendn(task->fd, &status_code, sizeof(int));
-
-    // 获取 uid
-    int uid = getUserIDByUsername(pconn, username);
-
-    // 查询 cryptpasswd
-    char* cryptpasswd = getCryptpasswdByUID(pconn, uid);
-    releaseDBConnection(task->dbpool, pconn);
-
-    // 提取 salt
-    char salt[16] = {0};
-    getSaltByCryptPasswd(salt, cryptpasswd);
-    free(cryptpasswd);
-
-    // 发送 salt
-    int salt_len = strlen(salt);
-    sendn(task->fd, &salt_len, sizeof(int));
-    sendn(task->fd, salt, salt_len);
-
-    // 更新本地 user_table
-    // 如果用户没到 check2，会在 say goodbye 时处理
-    task->u_table[task->fd] = uid;
-
-    log_debug("loginCheck1 end");
-    return;
-}
-
-void loginCheck2(Task* task) {
-    log_debug("loginCheck2 start");
-
-    // args[1] = u_cryptpasswd
-    char* u_cryptpasswd = task->args[1];
-    int uid = task->u_table[task->fd];
-
-    // 查询数据库中的 cryptpasswd
-    MYSQL* pconn = getDBConnection(task->dbpool);
-    char* cryptpasswd = getCryptpasswdByUID(pconn, uid);
-    releaseDBConnection(task->dbpool, pconn);
-
-    int status_code = 0;
-    if (strcmp(u_cryptpasswd, cryptpasswd) == 0) {
-        // 登录成功
-        sendn(task->fd, &status_code, sizeof(int));
-        log_info("[uid=%d] login successfully", uid);
-    } else {
-        // 登录失败，密码错误
-        status_code = 1;
-        sendn(task->fd, &status_code, sizeof(int));
-        log_warn("[%d] login failed", uid);
-    }
-
-    log_debug("loginCheck2 end");
-    return;
-}
-
-void regCheck1(Task* task) {
-    log_debug("regCheck1 start");
-    log_info("user to register: [%s]", task->args[1]);
-
-    char* username = task->args[1];
-    // 查数据库，用户名是否可用
-    // 0: 用户名可用, 1: 用户名已存在
-    int status_code = 0;
-    MYSQL* pconn = getDBConnection(task->dbpool);
-    if (userExist(pconn, username)) {
-        releaseDBConnection(task->dbpool, pconn);
-        status_code = 1;
-        sendn(task->fd, &status_code, sizeof(int));
-        return;
-    }
-    releaseDBConnection(task->dbpool, pconn);
-
-    // 可以注册
-    sendn(task->fd, &status_code, sizeof(int));
-    // 生成 salt
-    char* salt = generateSalt();
-    // 发送 salt
-    int salt_len = strlen(salt);
-    sendn(task->fd, &salt_len, sizeof(int));
-    sendn(task->fd, salt, salt_len);
-    free(salt);
-
-    log_debug("regCheck1 end");
-
-    return;
-}
-
-void regCheck2(Task* task) {
-    log_debug("regCheck2 start");
-
-    // args[1] = username
-    // args[2] = cryptpasswd
-
-    char* username = task->args[1];
-    char* cryptpasswd = task->args[2];
-
-    MYSQL* pconn = getDBConnection(task->dbpool);
-
-    long long pwdid = 0;
-    int uid = userInsert(pconn, username, cryptpasswd, pwdid);
-
-    // 插入用户目录记录到 nb_vftable
-    pwdid =
-        insertRecord(pconn, -1, uid, NULL, "home", "/", 'd', NULL, NULL, '1');
-    if (pwdid == -1) {
-        log_error("insertRecord failed");
-        exit(EXIT_FAILURE);
-    }
-    char pwdid_str[64] = {0};
-    sprintf(pwdid_str, "%lld", pwdid);
-
-    // 更新用户的 pwdid
-    int err = userUpdate(pconn, uid, "pwdid", pwdid_str);
-    if (err) {
-        log_error("userUpdate failed");
-        exit(EXIT_FAILURE);
-    }
-
-    releaseDBConnection(task->dbpool, pconn);
-
-    // 0: 注册成功
-    int status_code = 0;
-    sendn(task->fd, &status_code, sizeof(int));
-    log_info("[%s] register successfully", username);
-
-    log_debug("regCheck2 end");
-    return;
-}
-
-void unknownCmd(void) {
-    // TODO:
-
-    return;
-}
+void unknownCmd(void) { return; }
 
 int taskHandler(Task* task) {
     int retval = 0;

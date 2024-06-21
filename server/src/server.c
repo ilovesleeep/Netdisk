@@ -152,7 +152,7 @@ int serverExit(ThreadPool* pool) {
 
     // 通知各个子线程退出
     for (int j = 0; j < pool->num_threads; j++) {
-        Task exit_task = {-1, 0, NULL, 0, NULL, NULL, NULL};
+        Task exit_task = {-1, 0, NULL, 0, NULL, NULL};
         blockqPush(pool->task_queue, &exit_task);
     }
     // 等待各个子线程退出

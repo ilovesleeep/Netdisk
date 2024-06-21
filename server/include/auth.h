@@ -3,10 +3,13 @@
 
 #include "head.h"
 #include "log.h"
+#include "mysqloperate.h"
+#include "task.h"
+#include "transfer.h"
 
 char* generateSalt(void);
-void getSaltByCryptPasswd(char* salt, char* cryptpasswd);
 
+void getSaltByCryptPasswd(char* salt, char* cryptpasswd);
 char* getCryptpasswdByUID(MYSQL* pconn, int uid);
 int getUserIDByUsername(MYSQL* pconn, const char* username);
 
@@ -15,5 +18,10 @@ bool userPass(MYSQL* pconn, int uid, const char* cryptpasswd);
 int userInsert(MYSQL* pconn, const char* username, const char* cryptpasswd,
                long long pwdid);
 int userUpdate(MYSQL* pconn, int uid, const char* fieldname, const char* value);
+
+void regCheck1(Task* task);
+void regCheck2(Task* task);
+void loginCheck1(Task* task);
+void loginCheck2(Task* task);
 
 #endif
