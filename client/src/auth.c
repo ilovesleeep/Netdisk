@@ -131,15 +131,15 @@ static int userRegister2(int sockfd, char* username, char* salt) {
     return 0;
 }
 
-static int userLogin1(int sockfd, char* name, char* setting);
-static int userLogin2(int sockfd, char* setting);
+static int userLogin1(int sockfd, char* name, char* salt);
+static int userLogin2(int sockfd, char* cwd, char* salt);
 
-int userLogin(int sockfd, char* name) {
+int userLogin(int sockfd, char* name, char* cwd) {
     char salt[MAXLINE] = {0};
     // 发送用户名
     userLogin1(sockfd, name, salt);
     // 发送密码
-    userLogin2(sockfd, salt);
+    userLogin2(sockfd, cwd, salt);
 
     return 0;
 }
@@ -202,7 +202,7 @@ static int userLogin1(int sockfd, char* name, char* salt) {
     return 0;
 }
 
-static int userLogin2(int sockfd, char* salt) {
+static int userLogin2(int sockfd, char* cwd, char* salt) {
     int count = 0;
     while (1) {
         if (++count == 3) {
@@ -235,6 +235,10 @@ static int userLogin2(int sockfd, char* salt) {
             printf("Password error, please re-enter\n");
             continue;
         } else {
+            // 登录成功，获取用户上一次的工作目录
+            int cwd_len = 0;
+            recv(sockfd, &cwd_len, sizeof(cwd_len), MSG_WAITALL);
+            recv(sockfd, cwd, cwd_len, MSG_WAITALL);
             break;
         }
     }

@@ -2,6 +2,7 @@
 #include "../include/mysqloperate.h"
 #define MAX_CHILD_CHARACTER 512
 
+// 返回 pwdid
 int getPwdId(MYSQL* mysql, int uid) {
     int pwdid;
     char sql[60] = {};
@@ -159,6 +160,7 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* name, char* type) {
     return retval;
 }
 
+// path为传出参数，path_size为 path 的大小
 int getPwd(MYSQL* mysql, int pwdid, char* path, int path_size) {
     // 初始化MYSQL_STMT
     MYSQL_STMT* stmt = mysql_stmt_init(mysql);

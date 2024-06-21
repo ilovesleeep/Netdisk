@@ -398,6 +398,17 @@ void loginCheck2(Task* task) {
     if (strcmp(u_cryptpasswd, cryptpasswd) == 0) {
         // 登录成功
         sendn(task->fd, &status_code, sizeof(int));
+        // 获取用户上一次的工作目录
+        char cwd[1024] = {0};
+        MYSQL* pconn = getDBConnection(task->dbpool);
+        int pwdid = getPwdId(pconn, uid);
+        getPwd(pconn, uid, cwd, sizeof(cwd));
+        releaseDBConnection(task->dbpool, pconn);
+        // 发送给客户端
+        int cwd_len = strlen(cwd);
+        sendn(task->fd, &cwd_len, sizeof(int));
+        sendn(task->fd, cwd, cwd_len);
+
         log_info("[uid=%d] login successfully", uid);
     } else {
         // 登录失败，密码错误
@@ -453,6 +464,7 @@ void regCheck2(Task* task) {
 
     MYSQL* pconn = getDBConnection(task->dbpool);
 
+    // 插入用户记录到 nb_usertable
     long long pwdid = 0;
     int uid = userInsert(pconn, username, cryptpasswd, pwdid);
 

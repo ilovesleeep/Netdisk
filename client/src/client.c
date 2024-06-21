@@ -7,87 +7,6 @@
 #define NUM_THREADS 4
 #define MAXEVENTS 1024
 
-void welcome(int sockfd, char* username) {
-    int option = -1;
-    while (option < 0) {
-        printf("Enter option number: ");
-        fflush(stdout);
-
-        char input[3] = {0};
-        fgets(input, sizeof(input), stdin);
-
-        // input[0] for option, input[1] for check, input[2] for '\0'
-        option = input[0] - '0';
-        if (option < 1 || option > 3 || input[1] != '\n') {
-            if (input[0] == '\n' || input[1] == '\n') {
-                ;  // skip "\n" or "x\n"
-            } else {
-                char ch;
-                while ((ch = getchar()) != '\n' && ch != EOF) {
-                    ;  // 清空 stdin
-                }
-            }
-            printf("Invalid input, please enter again.\n");
-            option = -1;
-            continue;
-        }
-
-        switch (option) {
-            case 1:
-                userLogin(sockfd, username);
-                system("clear");
-                printf(
-                    "\033[47;30m Sir, this way! What can I do for you? "
-                    "\033[0m\n\n");
-                break;
-            case 2:
-                userRegister(sockfd);
-                system("clear");
-                printMenu();
-                option = -1;
-                break;
-            case 3:
-                printf("See you\n");
-                exit(EXIT_SUCCESS);
-        }
-    }
-}
-
-void printMenu(void) {
-    system("clear");
-    /*
-    printf(
-        "_________________________________\n"
-        "|                               |\n"
-        "|   Welcome to NewBee Netdisk!  |\n"
-        "|                               |\n"
-        "|      Menu:                    |\n"
-        "|           1. Login            |\n"
-        "|           2. Register         |\n"
-        "|           3. Exit             |\n"
-        "|                        v1.0   |\n"
-        "|_______________________________|\n\n");
-    */
-
-    printf(
-        "\033[1m\033[36m"
-        "                                        \n"
-        "         _   _      _      _ _     _    \n"
-        " __/\\__ | \\ | | ___| |_ __| (_)___| | __\n"
-        " \\ \033[31mN\033[36m  / |  \\| |/ _ \\ __/ _` | / __| |/ /\n"
-        " /_ \033[31mB\033[36m_\\ | |\\  |  __/ || (_| | \\__ \\   <\n"
-        "   \\/   |_| \\_|\\___|\\__\\__,_|.|___/_|\\_\\\n"
-        "                                        \n"
-        "            Menu:                       \n"
-        "                 1. Login               \n"
-        "                 2. Register            \n"
-        "                 3. Exit                \n"
-        "                                        \n"
-        "                                     v1.0\n"
-        "\033[0m"
-        "                                        \n");
-}
-
 char g_user[MAX_NAME_LENGTH + 1] = {0};  // +1 for '\0'
 char g_host[MAX_HOST_LENGTH] = "localhost";
 char g_cwd[MAXLINE] = "~";
@@ -186,24 +105,57 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
-char** getNewConnectionInfo(char* res_data) { return parseRequest(res_data); }
+static int optionCheck(char* input) {
+    // input[0] for option, input[1] for check, input[2] for '\0'
+    int option = input[0] - '0';
+    if (option < 1 || option > 3 || input[1] != '\n') {
+        if (input[0] == '\n' || input[1] == '\n') {
+            ;  // skip "\n" or "x\n"
+        } else {
+            char ch;
+            while ((ch = getchar()) != '\n' && ch != EOF) {
+                ;  // flash stdin
+            }
+        }
+        printf("Invalid input, please enter again.\n");
+        option = -1;
+    }
+    return option;
+}
 
-Task* getNewConnectionTask(Command cmd, char* res_data) {
-    // 响应内容中包含了：令牌 token, 资源服务器 host，端口 port 等其他信息
-    // 解析响应内容，获取新的连接需要的信息，创建新连接(长命令)任务
+void welcome(int sockfd, char* username) {
+    int option = -1;
+    while (option < 0) {
+        printf("Enter option number: ");
+        fflush(stdout);
 
-    // info[0] token, info[1]: host, info[2]: port
-    char** info = getNewConnectionInfo(res_data);
+        char input[3] = {0};
+        fgets(input, sizeof(input), stdin);
 
-    Task* task = (Task*)malloc(sizeof(Task));
-    task->cmd = cmd;
-    task->token = strdup(info[0]);
-    task->host = strdup(info[1]);
-    task->port = strdup(info[2]);
+        if ((option = optionCheck(input)) == -1) {
+            continue;
+        }
 
-    freeStringArray(info);
-
-    return task;
+        switch (option) {
+            case 1:
+                userLogin(sockfd, username, g_cwd);
+                system("clear");
+                printf(
+                    "\033[47;30m Sir, this way! What can I do for you? "
+                    "\033[0m\n\n");
+                ;
+                break;
+            case 2:
+                userRegister(sockfd);
+                system("clear");
+                printMenu();
+                option = -1;
+                break;
+            case 3:
+                printf("See you\n");
+                exit(EXIT_SUCCESS);
+        }
+    }
 }
 
 int shortResponseHandler(int sockfd, Command cmd) {
@@ -278,4 +230,25 @@ int responseHandler(int sockfd, ThreadPool* pool) {
     }
 
     return 0;
+}
+
+void printMenu(void) {
+    system("clear");
+    printf(
+        "\033[1m\033[36m"
+        "                                        \n"
+        "         _   _      _      _ _     _    \n"
+        " __/\\__ | \\ | | ___| |_ __| (_)___| | __\n"
+        " \\ \033[31mN\033[36m  / |  \\| |/ _ \\ __/ _` | / __| |/ /\n"
+        " /_ \033[31mB\033[36m_\\ | |\\  |  __/ || (_| | \\__ \\   <\n"
+        "   \\/   |_| \\_|\\___|\\__\\__,_|.|___/_|\\_\\\n"
+        "                                        \n"
+        "            Menu:                       \n"
+        "                 1. Login               \n"
+        "                 2. Register            \n"
+        "                 3. Exit                \n"
+        "                                        \n"
+        "                                     v1.0\n"
+        "\033[0m"
+        "                                        \n");
 }

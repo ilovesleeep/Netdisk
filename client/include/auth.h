@@ -7,6 +7,6 @@
 void getSetting(char* salt, char* passwd);
 
 int userRegister(int sockfd);
-int userLogin(int sockfd, char* name);
+int userLogin(int sockfd, char* name, char* cwd);
 
 #endif
