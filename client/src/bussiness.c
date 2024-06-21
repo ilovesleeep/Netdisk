@@ -304,16 +304,13 @@ void lsCmd(int sockfd) {
         return;
     }
 
+    // 接收函数，大火车
     int name_len = 0;
-    while (recv(sockfd, &name_len, sizeof(int), MSG_WAITALL)) {
-        if (name_len == 0) {
-            printf("\n");
-            break;
-        }
-        char filename[1000] = {0};
-        recv(sockfd, filename, name_len, MSG_WAITALL);
-        printf("%s\t", filename);
-    }
+    // bufsize = 4096;
+    char filename[BUFSIZE] = {0};
+    recv(sockfd, &name_len, sizeof(int), MSG_WAITALL);
+    recv(sockfd, filename, name_len, MSG_WAITALL);
+    printf("%s\n", filename);
 
     return;
 }

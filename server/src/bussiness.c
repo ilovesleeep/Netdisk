@@ -308,114 +308,33 @@ int recvFile(int sockfd, char* path) {
 }
 
 int cdCmd(Task* task) {
-    WorkDir* wd = task->wd_table[task->fd];
-    char msg[MAXLINE] = {0};
-    int send_status = 0;
-
-    // 检查参数个数是否合法
-    if (task->args[2] != NULL) {
-        // 不合法
-        send_status = 1;
-        sendn(task->fd, &send_status, sizeof(int));
-
-        strcpy(msg, "Parameter at most 1");
-        sendn(task->fd, msg, strlen(msg));
-        return -1;
-    }
-
-    // 没有参数，回到家目录
-    if (task->args[1] == NULL) {
-        sendn(task->fd, &send_status, sizeof(int));
-
-        wd->path[wd->index[1] + 1] = '\0';
-        wd->index[0] = 1;
-        strcpy(msg, "~");
-        sendn(task->fd, msg, strlen(msg));
-        return 0;
-    }
-
-    // 获取当前路径
-    char current_path[MAXLINE];
-    strcpy(current_path, wd->path);
-    current_path[wd->index[wd->index[0]] + 1] = '\0';
-
-    // 检查目标路径是否有效
-    char target_path[MAXLINE];
-    sprintf(target_path, "%s/%s", current_path, task->args[1]);
-    DIR* pdir;
-    if ((pdir = opendir(target_path)) == NULL) {
-        send_status = 1;
-        sendn(task->fd, &send_status, sizeof(int));
-
-        strcpy(msg, strerror(errno));
-        sendn(task->fd, msg, strlen(msg));
-        return -1;
-    }
-    closedir(pdir);
-
-    // 备份，越权时回退
-    char* path_bak = strdup(wd->path);
-    int index_bak[MAXLINE] = {0};
-    memcpy(&index_bak, wd->index, MAXLINE * sizeof(int));
-
-    // 更新 WorkDir
-    char* tmp = strdup(task->args[1]);
-    char* token = strtok(tmp, "/");
-    while (token) {
-        if (strcmp(token, ".") == 0) {
-            ;  // nothing to do
-        } else if (strcmp(token, "..") == 0) {
-            if (wd->index[0] == 1) {
-                // 没有上一级了
-                send_status = 1;
-                sendn(task->fd, &send_status, sizeof(int));
-
-                strcpy(msg, "Permission denied");
-                sendn(task->fd, msg, strlen(msg));
-                free(tmp);
-
-                log_warn("[%s] want to escape", wd->name);
-
-                // 回退
-                strcpy(wd->path, path_bak);
-                free(path_bak);
-                memcpy(wd->index, &index_bak, MAXLINE * sizeof(int));
-
-                return -1;
-            }
-
-            int pre_idx = wd->index[--wd->index[0]];
-            wd->path[pre_idx + 1] = '\0';
-        } else {
-            char* tmp_path = strdup(wd->path);
-            sprintf(wd->path, "%s/%s", tmp_path, token);
-            free(tmp_path);
-
-            int len = wd->index[wd->index[0]];
-            wd->index[++wd->index[0]] = len + strlen(token) + 1;  // +1 for '/'
-        }
-        token = strtok(NULL, "/");
-    }
-    free(tmp);
-
-    // 发送给客户端
-    sendn(task->fd, &send_status, sizeof(int));
-    int offset = wd->index[1] + 1;  // +1 for start position
-    sprintf(msg, "~%s", wd->path + offset);
-    sendn(task->fd, msg, strlen(msg));
+    // 告知客户端，接受当前命令的响应
+    char data[2] = "1";
+    int res_len = sizeof(Command) + 1;
+    sendn(task->fd, &res_len, sizeof(int));
+    sendn(task->fd, &task->cmd, sizeof(Command));
+    sendn(task->fd, data, 1);
 
     return 0;
 }
 
 void lsCmd(Task* task) {
+    // 告知客户端，接受当前命令的响应
+    char data[2] = "1";
+    int res_len = sizeof(Command) + 1;
+    sendn(task->fd, &res_len, sizeof(int));
+    sendn(task->fd, &task->cmd, sizeof(Command));
+    sendn(task->fd, data, 1);
+
     // 校验参数,发送校验结果，若为错误则继续发送错误信息
     if (task->args[1] != NULL) {
         int sendstat = 1;
         send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
-        char error_info[] = "parameter number error";
+        char* error_info = "parameter number error";
         int info_len = strlen(error_info);
         send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
         send(task->fd, error_info, info_len, MSG_NOSIGNAL);
+        log_error("lsCmd: parameter number error");
         return;
     } else {
         int sendstat = 0;
@@ -423,95 +342,65 @@ void lsCmd(Task* task) {
     }
 
     // 获取当前路径
-    char path[1000] = {0};
-    WorkDir* pathbase = task->wd_table[task->fd];
-    strncpy(path, pathbase->path, pathbase->index[pathbase->index[0]] + 1);
+    MYSQL* mysql = getDBConnection(task->dbpool);
+    // int pwdid = getPwdId(mysql, task->uid);
+    int pwdid = 1;
+    char** family = findchild(mysql, pwdid);
+    releaseDBConnection(task->dbpool, mysql);
 
-    // 打开目录
-    DIR* dir = opendir(pathbase->path);
+    // bufsize = 4096
+    char result[BUFSIZE] = {0};
 
-    // 发送文件信息
-    struct dirent* p = NULL;
-    while ((p = readdir(dir))) {
-        if (strcmp(p->d_name, ".") == 0 || strcmp(p->d_name, "..") == 0) {
-            continue;
-        }
-        int info_len = strlen(p->d_name);
-        char send_info[1000] = {0};
-        strcpy(send_info, p->d_name);
-        // 发送文件名长度及文件名
-        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-        send(task->fd, send_info, info_len, MSG_NOSIGNAL);
+    while (*family != NULL) {
+        strncat(result, *family, sizeof(result) - strlen(*family) - 1);
+        strncat(result, "\t", sizeof(result) - strlen("\t"));
+        family++;
     }
-    // 发送int类型的0(这个文件名长度为0)代表文件已发完
-    int info_len = 0;
+
+    for (int i = 0; family[i] != NULL; ++i) {
+        free(family);
+    }
+    free(family);
+
+    // 发送（大火车）
+    int info_len = strlen(result);
     send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+    send(task->fd, result, info_len, MSG_NOSIGNAL);
+
     return;
 }
 
-// 使用单独的函数来实现命令的功能
-int deleteDir(const char* dir) { return 0; }
+int deleteDir(int id, char* type) { return 0; }
 
 void rmCmd(Task* task) {
+    // 告知客户端，接受当前命令的响应
+    char data[2] = "1";
+    int res_len = sizeof(Command) + 1;
+    sendn(task->fd, &res_len, sizeof(int));
+    sendn(task->fd, &task->cmd, sizeof(Command));
+    sendn(task->fd, data, 1);
+
     // TODO:
-    // 删除每一个目录项
-    // 校验参数，发送校验结果，若为错误则发送错误信息
-    if (task->args[2] != NULL) {
-        int sendstat = 1;  // 错误
-        send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
-        char error_info[] = "parameter number error";
-        int info_len = strlen(error_info);
-        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-        send(task->fd, error_info, info_len, MSG_NOSIGNAL);
-        return;
-    } else {
-        int sendstat = 0;  // 正确
-        send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
-    }
+    // 删除文件及目录。
+    // 如果删除的是文件，则直接将它的exist设为“0”。
+    // 如果删除的是目录，则需要查看它是否存在子目录。需要遍历父目录id，找到和本目录id相等的行。
+    // 并且递归查询下去，直到找到一个目录项不是当前目录id为止，并将它们的exist类型都设置为“0”。
+    MYSQL* mysql;
+    int pwdid;
+    pwdid = getPwdId(mysql, task->uid);
+    // char pwd = getPwd(mysql, pwdid);
 
-    // 获取当前路径
-    char curr_path[MAXLINE] = {0};
-    WorkDir* wd = task->wd_table[task->fd];
-    strncpy(curr_path, wd->path, strlen(wd->path));
-
-    // 拼接路径
-    char dir[2 * MAXLINE] = {0};
-    sprintf(dir, "%s/%s", curr_path, task->args[1]);
-
-    // 使用deleteDir函数删除文件
-    int errnum;
-    if (remove(dir) == 0) {
-        printf("Successfully deleted %s\n", dir);
-        int send_stat = 0;
-        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-    } else if ((errnum = deleteDir(dir)) == 0) {
-        printf("Successfully deleted %s\n", dir);
-        int send_stat = 0;
-        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-    }
-
-    // 如果删除不存在的目录，则返回报错信息
-    int send_status = 1;
-    char msg[MAXLINE] = {0};
-    if (errnum == ENOENT) {
-        send(task->fd, &send_status, sizeof(int), MSG_NOSIGNAL);
-        strcpy(msg, strerror(errno));
-        int info_len = strlen(msg);
-        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-        send(task->fd, msg, info_len, MSG_NOSIGNAL);
-        return;
-    }
-
-    return;
+    char type;
+    // type = getTypeById(mysql, pwdid);
 }
 
 void pwdCmd(Task* task) {
-    // TODO:
-    char path[MAXLINE] = {0};
-    WorkDir* wd = task->wd_table[task->fd];
-    strncpy(path, wd->path, strlen(wd->path));
-
-    sendn(task->fd, path, sizeof(path));
+    // 告知客户端，接受当前命令的响应
+    char data[2] = "1";
+    int res_len = sizeof(Command) + 1;
+    sendn(task->fd, &res_len, sizeof(int));
+    sendn(task->fd, &task->cmd, sizeof(Command));
+    sendn(task->fd, data, 1);
 
     return;
 }
@@ -546,8 +435,8 @@ int getsCmd(Task* task) {
                 if (*(p + 1) == '/') {
                     bzero(file_name, sizeof(file_name));
                     strncpy(file_name, start, p - start + 1);
-                    target_pwdid =
-                        goToRelativeDir(mysql, target_pwdid, file_name, NULL);
+                    // target_pwdid =
+                    //     goToRelativeDir(mysql, target_pwdid, file_name);
                     if (target_pwdid == -1) {
                         // 路径错误
                         //***消息对接***
@@ -657,69 +546,52 @@ int putsCmd(Task* task) {
 }
 
 void mkdirCmd(Task* task) {
-    if (task->args[1] == NULL) {  // missing operand
+    // 告知客户端，接受当前命令的响应
+    char data[2] = "1";
+    int res_len = sizeof(Command) + 1;
+    sendn(task->fd, &res_len, sizeof(int));
+    sendn(task->fd, &task->cmd, sizeof(Command));
+    sendn(task->fd, data, 1);
+
+    if (task->args[0] == NULL || task->args[1] != NULL) {  // missing operand
         char errmsg[MAXLINE] = "mkdir: missing operand";
+        int res_len = strlen(errmsg);
+
         send(task->fd, errmsg, strlen(errmsg), 0);
-        // 后面补日志
+        log_error("mkdirCmd: missing operand");
         error(0, errno, "%d mkdir:", task->fd);
         return;
     }
+    int pwdid = 0;
+    char* mkdir_path = task->args[0];
 
-    // if (sizeof(task ->args[1]) >= 1000) {
-    //     error(1, 0, "mkdir_dirlen too long!");
-    // }
+    // MAX_PATH_LENGTH = 2048
+    char absolute_path[2048] = {0};
+    if (mkdir_path[0] == '/') {
+        // 返回错误信息
+        // TODO:
 
-    // 找到当前目录
-    // bug: 如果在极端情况下，path有1k长度，mkdir_dirlen也有1k长度，会溢出
-    char curr_path[MAXLINE] = {0};
-    WorkDir* wd = task->wd_table[task->fd];
-    strncpy(curr_path, wd->path, strlen(wd->path));
+    } else if (mkdir_path[0] == '~') {
+        // mkdir 绝对路径
+        strcpy(absolute_path, mkdir_path);
 
-    int index = wd->index[wd->index[0]];
-    curr_path[index + 1] = '\0';
+        MYSQL* mysql = getDBConnection(task->dbpool);
+        pwdid = goToRelativeDir(mysql, getPwdId(mysql, task->uid), "~", NULL);
 
-    // 将当前目录和args[1]拼接在一起
-    char dir[2 * MAXLINE] = {0};
-    sprintf(dir, "%s/%s", curr_path, task->args[1]);
-
-    // debug
-    // printf("wd->index[1] = %d, wd->index[0] = %d\n", wd->index[wd->index[0]],
-    // wd->index[0]); printf("wdpath = %s\n", wd->path); printf("curpath =
-    // %s\n", curr_path); printf("dir = %s\n",dir);
-
-    // 根据dir递归创建目录
-    // 找每个'/',将其替换成'\0'
-    for (char* p = dir + 1; *p; ++p) {
-        if (*p == '/') {
-            // 这里没有跳过多余的'/'，但没有出bug，大概率是mkdir背后做了这个事情
-            *p = '\0';
-
-            if (mkdir(dir, 0777) && errno != EEXIST) {
-                char errmsg[MAXLINE] = "mkdir";
-                strncat(errmsg, strerror(errno),
-                        sizeof(errmsg) - strlen(strerror(errno)) - 1);
-                send(task->fd, errmsg, strlen(errmsg), 0);
-                // 后面补日志
-                error(0, errno, "%d mkdir:", task->fd);
-                return;
-            }
-
-            *p = '/';
-        }
+    } else {
+        // mkdir 相对路径
     }
 
-    if (mkdir(dir, 0777) && errno != EEXIST) {
-        char errmsg[MAXLINE] = "mkdir";
-        strncat(errmsg, strerror(errno),
-                sizeof(errmsg) - strlen(strerror(errno)) - 1);
-        send(task->fd, errmsg, strlen(errmsg), 0);
-        // 后面补日志
-        error(0, errno, "%d mkdir:", task->fd);
-        return;
-    }
+    // char filename[512] = {0};
+    //     for (char* p = absolute_path; *p != '\0'; ++p) {
+    //         for (char* start = p; *p != '\0' && *p != '/'; ++p) {
+    //             if (*(p + 1) == '/') {
+    //                 bzero(filename, sizeof(filename));
+    //                 strncpy(filename, start, p - start - 1);
 
-    // 成功了给客户端发一个0
-    send(task->fd, "0", sizeof("0"), 0);
+    //             }
+    //         }
+    //     }
 
     return;
 }
@@ -843,12 +715,12 @@ void regCheck2(Task* task) {
 
     MYSQL* pconn = getDBConnection(task->dbpool);
 
-    // 插入用户记录到 nb_usertable
-    long long pwdid = -1;
+    long long pwdid = 0;
     int uid = userInsert(pconn, username, cryptpasswd, pwdid);
 
     // 插入用户目录记录到 nb_vftable
-    pwdid = insertRecord(pconn, -1, uid, NULL, "home", "/", 'd', NULL, NULL);
+    pwdid =
+        insertRecord(pconn, -1, uid, NULL, "home", "/", 'd', NULL, NULL, '1');
     if (pwdid == -1) {
         log_error("insertRecord failed");
         exit(EXIT_FAILURE);

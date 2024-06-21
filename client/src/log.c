@@ -164,7 +164,7 @@ void initLog(void) {
     char filename[64];
     strftime(filename, SIZE(filename), "./client_log_%Y_%m_%d.log", local_time);
 
-    LogConfig conf = {NULL, LOG_ERROR, 1};
+    LogConfig conf = {"init_log_path", LOG_ERROR, 1};
 
     // 打开文件用于追加，若文件不存在则创建
     FILE* fp = fopen(filename, "a");
