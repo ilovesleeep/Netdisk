@@ -163,11 +163,11 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
     unsigned char recv_hash[17] = {0};
     recvn(sockfd, recv_hash, sizeof(recv_hash));
 
-    //查看是否有同名文件
+    // 查看是否有同名文件
     char type = '\0';
     int file_id = goToRelativeDir(mysql, p_id, block.data, &type);
-    if(file_id != 0 && type == 'd' || file_id > 0){
-        //已存在目录 || 文件已存在
+    if (file_id != 0 && type == 'd' || file_id > 0) {
+        // 已存在目录 || 文件已存在
         int send_stat = 1;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
         char send_info[] = "illegal file name";
@@ -176,42 +176,41 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
         send(sockfd, send_info, info_len, MSG_NOSIGNAL);
         return 0;
     }
-    if(file_id < 0 && type == 'f'){
-        //修改目录项
+    if (file_id < 0 && type == 'f') {
+        // 修改目录项
         file_id = -file_id;
-        updateRecord(mysql, file_id, NULL, NULL, recv_hash, NULL, NULL, NULL, NULL);
+        updateRecord(mysql, file_id, NULL, NULL, recv_hash, NULL, NULL, NULL,
+                     NULL);
         int send_stat = 1;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-    }
-    else{
+    } else {
         off_t c_size = 0;
-        file_id = insertRecord(mysql, p_id, u_id, recv_hash, block.data, path, 'f', &fsize, &c_size, '0');
+        file_id = insertRecord(mysql, p_id, u_id, recv_hash, block.data, path,
+                               'f', &fsize, &c_size, '0');
         int send_stat = 1;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
     }
-
-
 
     // 查表查看是否文件存在(f_hash)(是否可以续传)
     off_t f_size, c_size;
     localFile(mysql, recv_hash, &f_size, &c_size);
-    if(c_size == f_size && f_size != 0){
-        //文件已存在且完整
+    if (c_size == f_size && f_size != 0) {
+        // 文件已存在且完整
         int send_stat = 0;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-        
-        updateRecord(mysql, file_id, NULL, NULL, recv_hash, NULL, &f_size, &c_size, "1");
+
+        updateRecord(mysql, file_id, NULL, NULL, recv_hash, NULL, &f_size,
+                     &c_size, "1");
         return 0;
-    }
-    else{
-        //文件存在但不完整或文件不存在
+    } else {
+        // 文件存在但不完整或文件不存在
         int send_stat = 1;
-        if(send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL) == -1){
+        if (send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL) == -1) {
             return 1;
         }
     }
-    //发送服务器准备从哪里开始接收
-    if(send(sockfd, &c_size, sizeof(off_t), MSG_NOSIGNAL) == -1){
+    // 发送服务器准备从哪里开始接收
+    if (send(sockfd, &c_size, sizeof(off_t), MSG_NOSIGNAL) == -1) {
         return 1;
     }
     // 打开文件
@@ -234,7 +233,8 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
             if (recvn(sockfd, addr, length) == -1) {
                 close(fd);
                 munmap(addr, length);
-                updateRecord(mysql, file_id, NULL, NULL, NULL, NULL, NULL, &recv_bytes, NULL);
+                updateRecord(mysql, file_id, NULL, NULL, NULL, NULL, NULL,
+                             &recv_bytes, NULL);
                 return 1;
             }
             munmap(addr, length);
@@ -251,7 +251,8 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
                 (fsize - recv_bytes >= BUFSIZE) ? BUFSIZE : fsize - recv_bytes;
             if (recvn(sockfd, buf, length) == -1) {
                 close(fd);
-                updateRecord(mysql, file_id, NULL, NULL, NULL, NULL, NULL, &recv_bytes, NULL);
+                updateRecord(mysql, file_id, NULL, NULL, NULL, NULL, NULL,
+                             &recv_bytes, NULL);
                 return 1;
             }
             write(fd, buf, length);
@@ -374,7 +375,6 @@ void lsCmd(Task* task) {
     // sendn(task->fd, &task->cmd, sizeof(Command));
     // sendn(task->fd, data, 1);
 
-
     // bufsize = 4096
     char result[BUFSIZE] = {0};
 
@@ -419,8 +419,7 @@ void lsCmd(Task* task) {
     return;
 }
 
-int delFileOrDir(int pwdid) {
-    MYSQL* mysql;
+int delFileOrDir(MYSQL *mysql,int pwdid) {
     // 通过set exist='0'删除文件或目录
     char sql[60] = {0};
     sprintf(sql, "update nb_vftable set exist='0' where id=%d", pwdid);
@@ -434,12 +433,11 @@ int delFileOrDir(int pwdid) {
 }
 
 // 传入uid,pwdid,name,type,判断传入的是文件还是目录
-int rmCmdHelper(int uid, int pwdid, char* name, char type) {
-    MYSQL* mysql;
+int rmCmdHelper(MYSQL *mysql,int uid, int pwdid, char* name, char type) {
     // 获取类型
     if (type == 'f') {
         // 类型为file,直接删除
-        int res = delFileOrDir(pwdid);
+        int res = delFileOrDir(mysql,pwdid);
         if (res != 0) {
             log_error("del failed.");
             error(1, 0, "[ERROR] del failed\n");
@@ -452,7 +450,7 @@ int rmCmdHelper(int uid, int pwdid, char* name, char type) {
         while (*child != NULL) {
             int childpwdid = getPwdId(mysql, uid);
             char type = getTypeById(mysql, childpwdid);
-            int res = rmCmdHelper(uid, childpwdid, *child, type);
+            int res = rmCmdHelper(mysql,uid, childpwdid, *child, type);
             if (res != 0) {
                 log_error("del failed.");
                 error(1, 0, "[ERROR] del failed\n");
@@ -461,7 +459,7 @@ int rmCmdHelper(int uid, int pwdid, char* name, char type) {
         }
     }
 
-    int res = delFileOrDir(pwdid);
+    int res = delFileOrDir(mysql,pwdid);
     if (res != 0) {
         log_error("del failed.");
         error(1, 0, "[ERROR] del failed\n");
@@ -508,29 +506,31 @@ void rmCmd(Task* task) {
         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
     }
 
-    MYSQL* mysql;
+    MYSQL* mysql = getDBConnection(task->dbpool);
     int pwdid = getPwdId(mysql, task->uid);
-    char *pwd;
-    getPwd(mysql, pwdid,*pwd,1024);
+    char pwd[1024];
+    getPwd(mysql, pwdid, pwd, 1024);
     char type = getTypeById(mysql, pwdid);
 
-    int res = rmCmdHelper(task->uid, pwdid, pwd, type);
+    int res = rmCmdHelper(mysql,task->uid, pwdid, pwd, type);
     if (res != 0) {
         // 错误，未能成功删除
         int send_stat = 1;
-        send(task->fd,&send_stat,sizeof(int),MSG_NOSIGNAL);
+        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
         char error_info[] = "rm failed";
         int info_len = strlen(error_info);
-        send(task->fd,&info_len,sizeof(int),MSG_NOSIGNAL);
-        send(task->fd,error_info,info_len,MSG_NOSIGNAL);
-        log_error("rm %s failed.",pwd);
+        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+        send(task->fd, error_info, info_len, MSG_NOSIGNAL);
+        log_error("rm %s failed.", pwd);
+        releaseDBConnection(task->dbpool,mysql);
         error(1, 0, "[ERROR] rm failed\n");
-    }else{
+    } else {
         // 成功删除
         int send_stat = 0;
-        send(task->fd,&send_stat,sizeof(int),MSG_NOSIGNAL);
+        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
     }
 
+    releaseDBConnection(task->dbpool,mysql);
     return;
 }
 
