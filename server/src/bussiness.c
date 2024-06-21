@@ -408,11 +408,11 @@ int cdCmd(Task* task) {
 }
 
 void lsCmd(Task* task) {
-    char data[2] = "1";
-    int res_len = sizeof(Command) + 1;
-    sendn(task->fd, &res_len, sizeof(int));
-    sendn(task->fd, &task->cmd, sizeof(Command));
-    sendn(task->fd, data, 1);
+    // char data[2] = "1";
+    // int res_len = sizeof(Command) + 1;
+    // sendn(task->fd, &res_len, sizeof(int));
+    // sendn(task->fd, &task->cmd, sizeof(Command));
+    // sendn(task->fd, data, 1);
 
 
     // bufsize = 4096
@@ -458,9 +458,6 @@ void lsCmd(Task* task) {
 
     return;
 }
-
-int deleteDir(int id,char *type){
-
 
 int delFileOrDir(int pwdid) {
     MYSQL* mysql;
@@ -521,11 +518,11 @@ void rmCmd(Task* task) {
     // 并且递归查询下去，直到找到一个目录项不是当前目录id为止，并将它们的exist类型都设置为“0”。
 
     // 告知客户端接收当前命令的响应
-    char data[2] = "1";
-    int res_len = sizeof(Command) + 1;
-    sendn(task->fd, &res_len, sizeof(int));
-    sendn(task->fd, &task->cmd, sizeof(Command));
-    sendn(task->fd, data, 1);
+    // char data[2] = "1";
+    // int res_len = sizeof(Command) + 1;
+    // sendn(task->fd, &res_len, sizeof(int));
+    // sendn(task->fd, &task->cmd, sizeof(Command));
+    // sendn(task->fd, data, 1);
 
     // 参数校验,只接受一个参数。 "usage: rm file/dict."
     if (task->args[1] == NULL) {
@@ -553,7 +550,8 @@ void rmCmd(Task* task) {
 
     MYSQL* mysql;
     int pwdid = getPwdId(mysql, task->uid);
-    char pwd = getPwd(mysql, pwdid);
+    char *pwd;
+    getPwd(mysql, pwdid,*pwd,1024);
     char type = getTypeById(mysql, pwdid);
 
     int res = rmCmdHelper(task->uid, pwdid, pwd, type);
