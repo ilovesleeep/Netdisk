@@ -16,7 +16,7 @@ int sendn(int sockfd, void* buf, int length);
 int recvn(int sockfd, void* buf, int length);
 
 int sendFile(int sockfd, int fd, off_t f_size);
-int recvFile(int sockfd, MYSQL* mysql, int u_id);
+int recvFile(int sockfd, MYSQL* mysql, int uid);
 
 int cdCmd(Task* task);
 void lsCmd(Task* task);
