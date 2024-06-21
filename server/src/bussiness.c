@@ -622,8 +622,8 @@ int getsCmd(Task* task) {
         strcpy(block.data, *parameter);
         block.length = strlen(*parameter);
         sendn(task->fd, &block, sizeof(int) + block.length);
-        if (sendFile(task->fd, fd) ==
-            1) {  // sendfile中close了fd,若返回值为1证明连接中断,则不进行剩余发送任务
+        if (sendFile(task->fd, fd) == 1) {  
+            // sendfile中close了fd,若返回值为1证明连接中断,则不进行剩余发送任务
             return 1;
         }
     }
