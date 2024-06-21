@@ -700,6 +700,8 @@ void mkdirCmd(Task* task) {
             send(task->fd, errmsg, res_len, MSG_NOSIGNAL);
             log_error("%s", errmsg);
         } else {
+            res_len = 0;
+            send(task->fd, &res_len, sizeof(int), MSG_NOSIGNAL);
             log_info("mkdir: insert succeed");
         }
 
@@ -724,9 +726,16 @@ void mkdirCmd(Task* task) {
 
             int update_ret = mysql_query(mysql, query);
             if (update_ret != 0) {
+                char* errmsg = "mkdir: mysql_query update failed";
+                res_len = strlen(errmsg);
+                send(task->fd, &res_len, sizeof(int), MSG_NOSIGNAL);
+                send(task->fd, errmsg, res_len, MSG_NOSIGNAL);
+                
+                error(0, errno, "mkdir: mysql_query");
                 log_error("mkdir: mysql_query: %s", strerror(errno));
-                error(1, errno, "mkdir: mysql_query");
-            } else {
+            }else {
+                res_len = 0;
+                send(task->fd, &res_len, sizeof(int), MSG_NOSIGNAL);
                 log_info("mkdir: mysql_query succeed");
             }
         } else {  // 是文件，不能创建
