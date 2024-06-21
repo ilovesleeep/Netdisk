@@ -359,7 +359,7 @@ void lsCmd(Task* task) {
         // 获取当前路径
         MYSQL* mysql = getDBConnection(task->dbpool);
         // int pwdid = getPwdId(mysql, task->uid);
-        int pwdid = 1;
+        int pwdid = getPwdId(mysql, task->uid);
         char** family = findchild(mysql, pwdid);
         char** p = family;
         releaseDBConnection(task->dbpool, mysql);
@@ -481,7 +481,6 @@ void rmCmd(Task* task) {
         log_error("rm %s failed.", pwd);
         releaseDBConnection(task->dbpool,mysql);
         error(1, 0, "[ERROR] rm failed\n");
-    } else {
     } else {
         // 成功删除
         int send_stat = 0;
