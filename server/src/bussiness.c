@@ -629,9 +629,11 @@ int getsCmd(Task* task) {
         }
         // 此时file_name即文件名,target_pwdid为待发送的id
         // 检查文件是否完整(不用检查了,我只会将完整的文件目录项设为1)
-        
-        getFileInfo(mysql, target_pwdid, )
-        int fd = open(path_file, O_RDWR);
+        off_t f_size;
+        off_t c_size;
+        char f_hash[17] = {0};
+        getFileInfo(mysql, target_pwdid, f_hash, &f_size, &c_size);
+        int fd = open(f_hash, O_RDWR);
         // 检查文件是否存在
         // 不存在
         if (fd == -1) {
