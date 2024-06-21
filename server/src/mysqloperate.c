@@ -84,7 +84,6 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* name,char *type) {
         if (res == NULL) {
             return -1;
         }
-
         // 初始化结果绑定参数
         MYSQL_BIND res_bind[2];
 
@@ -185,7 +184,7 @@ int getPwd(MYSQL* mysql, int pwdid, char* path, int path_size){
 }
 
 
-char** findchild(MYSQL* mysql, int pwdid, char type){
+char** findchild(MYSQL* mysql, int pwdid){
     int idx = 0;
     char** family = (char**)calloc(MAX_CHILD_CHARACTER * 4, sizeof(char*));
     if (family == NULL) {
