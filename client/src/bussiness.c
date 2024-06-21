@@ -131,16 +131,16 @@ void sendFile(int sockfd, int fd) {
 }
 
 void recvFile(int sockfd) {
-    // 先接收哈希值和文件大小
-    char f_hash[16] = {0};
-    recvn(sockfd, f_hash, 32);
-    off_t f_size = 0;
-    recvn(sockfd, f_size, sizeof(off_t));
     // 接收文件名
     DataBlock block;
     bzero(&block, sizeof(block));
     recvn(sockfd, &block.length, sizeof(int));
     recvn(sockfd, block.data, block.length);
+    // 先接收哈希值和文件大小
+    char f_hash[17] = {0};
+    recvn(sockfd, f_hash, 16);
+    off_t f_size = 0;
+    recvn(sockfd, &f_size, sizeof(off_t));
 
     // 打开文件
     int fd = open(block.data, O_RDWR | O_CREAT, 0666);
