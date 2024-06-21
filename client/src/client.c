@@ -6,7 +6,7 @@
 #define NUM_THREADS 4
 #define MAXEVENTS 1024
 
-int main(int argc, char* argv[]) {
+int main_bak(int argc, char* argv[]) {
     if (argc != 3) {
         error(1, 0, "Usage: %s [host] [port]\n", argv[0]);
     }
@@ -82,10 +82,10 @@ int sessionHandler(int sockfd, char* host, char* user) {
         char** args = parseRequest(buf);
         Command cmd = getCommand(args[0]);
         if (cmd == CMD_UNKNOWN) {
-            argsFree(args);
+            freeStringArray(args);
             continue;
         } else if (cmd == CMD_EXIT) {
-            argsFree(args);
+            freeStringArray(args);
             close(sockfd);
             return 0;
         }
@@ -129,7 +129,7 @@ int sessionHandler(int sockfd, char* host, char* user) {
                 break;
         }
         // NOTE: 勿忘我
-        argsFree(args);
+        freeStringArray(args);
     }
 }
 
@@ -168,7 +168,7 @@ void printMenu(void) {
         "                                        \n");
 }
 
-int mainTest(int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
     if (argc != 3) {
         error(1, 0, "Usage: %s [host] [port]\n", argv[0]);
     }
@@ -210,16 +210,18 @@ int mainTest(int argc, char* argv[]) {
                 int buf_len = read(STDIN_FILENO, buf, BUFSIZE);
                 buf[--buf_len] = '\0';  // -1 for '\n'
 
+                log_debug("用户输入：'%s'", buf);
+
                 // 解析请求
                 char** args = parseRequest(buf);
                 Command cmd = getCommand(args[0]);
                 if (cmd == CMD_UNKNOWN) {
                     // 不响应
-                    argsFree(args);
+                    freeStringArray(args);
                     continue;
                 } else if (cmd == CMD_EXIT) {
-                    // 执行退出逻辑
-                    argsFree(args);
+                    // TODO: 退出逻辑
+                    freeStringArray(args);
                     close(sockfd);
                     exit(EXIT_SUCCESS);
                 }
@@ -232,15 +234,19 @@ int mainTest(int argc, char* argv[]) {
                 sendn(sockfd, &cmd, sizeof(cmd));
                 sendn(sockfd, buf, buf_len);
 
-                argsFree(args);
+                freeStringArray(args);
 
             } else if (ready_events[i].data.fd == sockfd) {
                 // 处理调度服务器响应
-                // responseHandler(sockfd, pool);
-                // shortResponseHandler(sockfd);
+                responseHandler(sockfd, pool);
+
+                printf("\033[32m[%s@%s]:\033[33m%s\033[0m$ ", user, argv[1],
+                       cwd);
+                fflush(stdout);
 
             } else {
-                // 收到其他资源服务器的响应数据
+                // 其他
+                log_debug("other socket");
             }
         }
     }
@@ -280,15 +286,6 @@ int responseHandler(int sockfd, ThreadPool* pool) {
         ret = recv(sockfd, res_data, data_len, MSG_WAITALL);
 
         if (ret > 0) {  // 接收到了有效响应
-            /*
-            if (cmd == CMD_PUTS || cmd == CMD_GETS) {
-                // 响应内容中包含了新的端口号等其他信息（资源服务器地址）
-                // 解析响应内容，获取新的连接需要的信息，创建新连接(长命令)任务
-                Task* task = getNewConnectionTask(res_data);
-                blockqPush(pool->task_queue, task);
-                return 0;
-            }
-            */
             // 分离长短命令, 主线程处理短命令响应
             Task* task = NULL;  // 避免警告，在标签外声明 task
             switch (cmd) {
@@ -312,6 +309,7 @@ int responseHandler(int sockfd, ThreadPool* pool) {
             }
             // 只有长命令才能走到这里
             blockqPush(pool->task_queue, task);
+            return 0;
         }
     }
 
@@ -319,9 +317,15 @@ int responseHandler(int sockfd, ThreadPool* pool) {
         // 与服务器断开连接
         log_info("Say goodbye to [Main Server]");
         close(sockfd);
+        // 退出
+        exit(EXIT_FAILURE);
     } else if (ret < 0) {
         // 发生错误
         log_error("recv: %", strerror(errno));
+        close(sockfd);
+        // 退出
+        exit(EXIT_FAILURE);
     }
+
     return 0;
 }
