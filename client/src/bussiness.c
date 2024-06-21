@@ -431,7 +431,7 @@ int putsCmd(int sockfd, char** args) {
     return 0;
 }
 
-void mkdirCmd(int sockfd) {
+int mkdirCmd(int sockfd) {
     // 接收函数，大火车
     int name_len = 0;
     // bufsize = 4096;
@@ -442,5 +442,5 @@ void mkdirCmd(int sockfd) {
         printf("%s\n", filename);
     }
     
-    return;
+    return 0;
 }
