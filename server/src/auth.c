@@ -16,15 +16,15 @@ char* generateSalt(void) {
     for (i = 3; i < salt_len; ++i) {
         flag = rand() % 3;
         switch (flag) {
-            case 0:
-                salt[i] = rand() % 26 + 'a';
-                break;
-            case 1:
-                salt[i] = rand() % 26 + 'A';
-                break;
-            case 2:
-                salt[i] = rand() % 10 + '0';
-                break;
+        case 0:
+            salt[i] = rand() % 26 + 'a';
+            break;
+        case 1:
+            salt[i] = rand() % 26 + 'A';
+            break;
+        case 2:
+            salt[i] = rand() % 10 + '0';
+            break;
         }
     }
     salt[salt_len - 1] = '$';
@@ -319,7 +319,6 @@ int userUpdate(MYSQL* pconn, int uid, const char* fieldname,
         log_error(mysql_error(pconn));
         return -1;
     }
-    // 提交事务
 
 
     // 检查是否成功更新
@@ -328,7 +327,8 @@ int userUpdate(MYSQL* pconn, int uid, const char* fieldname,
                  fieldname);
         return 1;
     }
-        mysql_query(pconn, "COMMIT");
+    // 提交事务
+    mysql_query(pconn, "COMMIT");
 
     return 0;
 }
