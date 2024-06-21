@@ -174,4 +174,5 @@ void initLog(void) {
     printf("set log filename: %s\n", filename);
     log_add_fp(fp, conf.level);
     log_set_quiet(conf.quiet);
+    log_set_level(conf.level);
 }
