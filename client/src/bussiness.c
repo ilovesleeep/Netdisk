@@ -431,11 +431,16 @@ int putsCmd(int sockfd, char** args) {
     return 0;
 }
 
-int mkdirCmd(int sockfd) {
-    char buf[MAXLINE] = {0};
-    recv(sockfd, buf, MAXLINE, 0);
-    if (strcmp(buf, "0") != 0) {
-        puts(buf);
+void mkdirCmd(int sockfd) {
+    // 接收函数，大火车
+    int name_len = 0;
+    // bufsize = 4096;
+    char filename[BUFSIZE] = {0};
+    recv(sockfd, &name_len, sizeof(int), MSG_WAITALL);
+    if (name_len != 0) {
+        recv(sockfd, filename, name_len, MSG_WAITALL);
+        printf("%s\n", filename);
     }
-    return 0;
+    
+    return;
 }
