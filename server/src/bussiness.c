@@ -380,7 +380,7 @@ void lsCmd(Task* task) {
     char result[BUFSIZE] = {0};
 
     // 校验参数,发送校验结果，若为错误则继续发送错误信息
-    if (task->args[0] != NULL) {
+    if (task->args[1] != NULL) {
         // int sendstat = 1;
         // send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
 
@@ -716,7 +716,7 @@ void mkdirCmd(Task* task) {
     sendn(task->fd, data, 1);
 
 
-    if (task->args[0] == NULL || task->args[1] != NULL) {  // missing operand
+    if (task->args[1] == NULL || task->args[2] != NULL) {  // missing operand
         char errmsg[MAXLINE] = "mkdir: missing operand";
         res_len = strlen(errmsg);
         send(task->fd, &res_len, sizeof(int), MSG_NOSIGNAL);
@@ -729,7 +729,7 @@ void mkdirCmd(Task* task) {
 
     MYSQL* mysql = getDBConnection(task->dbpool);
     int pwdid = getPwdId(mysql, task->uid);            // pwdid
-    char* mkdir_name = task->args[0];                  // name
+    char* mkdir_name = task->args[1];                  // name
 
     char pwd[1024] = {0};                              // 当前目录的绝对路径
     if (getPwd(mysql, pwdid, pwd, 1024) == -1) {
@@ -744,13 +744,13 @@ void mkdirCmd(Task* task) {
 
     char* absolute_path[1024] = {0};              // 绝对路径
     sprintf(absolute_path, "%s/%s", pwd, mkdir_name);
-    char* type = "d";  // 类型
+    char type = 'd';  // 类型
 
     int ret = goToRelativeDir(mysql, pwdid, mkdir_name, type);
     if (ret == 0) {
         // 不存在, insert
         int insert_ret = insertRecord(mysql, pwdid, task->uid, NULL, mkdir_name, absolute_path, 
-                    "d", NULL, NULL, '1');
+                    'd', NULL, NULL, '1');
         releaseDBConnection(task->dbpool, mysql);
         if (insert_ret == -1) {
             char* errmsg = "mkdir: insert failed";
@@ -773,7 +773,7 @@ void mkdirCmd(Task* task) {
     } else {
         // ret < 0 
         // 目录项存在，exist = 0
-        if (strcmp(type, "d") == 0) { // 是目录，exist改为1
+        if (type == 'd') { // 是目录，exist改为1
             const char* query_str = "update nb_vftable set exist = 1 where id = ";
             char str[16] = {0};
             sprintf(str, "%d", -ret);
@@ -796,9 +796,6 @@ void mkdirCmd(Task* task) {
         }
         releaseDBConnection(task->dbpool, mysql);
     } 
-    
-    
-
     return;
 }
 
