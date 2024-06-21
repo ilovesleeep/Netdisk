@@ -17,10 +17,12 @@ typedef enum {
     CMD_LOGIN2,
     CMD_EXIT,
     CMD_UNKNOWN,
+    CMD_STOP,
 } Command;
 
 char** parseRequest(const char* req);
-void argsFree(char** args);
+
+void freeStringArray(char** array);
 
 Command getCommand(const char* cmd);
 

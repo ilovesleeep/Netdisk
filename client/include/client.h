@@ -8,6 +8,7 @@
 #include "head.h"
 #include "network.h"
 #include "parser.h"
+#include "threadpool.h"
 
 int clientMain(int argc, char* argv[]);
 
@@ -16,6 +17,11 @@ void printMenu(void);
 void welcome(int sockfd, char* username);
 
 int sessionHandler(int sockfd, char* host, char* user);
-// void* sessionHandler(void* arg);
+
+int responseHandler(int sockfd, ThreadPool* pool);
+
+char** getNewConnectionInfo(char* res_data);
+
+Task* getNewConnectionTask(Command cmd, char* res_data);
 
 #endif

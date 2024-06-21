@@ -23,6 +23,9 @@ typedef enum {
 void readConfig(const char* filename, HashTable* ht);
 
 char** getArgs(const char* req);
+
 Command getCommand(const char* cmd);
+
+void freeStringArray(char** array);
 
 #endif
