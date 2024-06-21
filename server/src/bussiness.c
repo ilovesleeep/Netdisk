@@ -774,7 +774,7 @@ void mkdirCmd(Task* task) {
     MYSQL* mysql = getDBConnection(task->dbpool);
     int pwdid = getPwdId(mysql, task->uid);            // pwdid
     char* mkdir_name = task->args[0];                  // name
-    char* pwd = getPwd();
+    char* pwd = getPwd();                         // 当前目录的绝对路径
     char* absolute_path[1024] = {0};              // 绝对路径
     sprintf(absolute_path, "%s/%s", pwd, mkdir_name);
     char* type = "d";  // 类型
