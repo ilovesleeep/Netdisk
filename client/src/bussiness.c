@@ -292,17 +292,17 @@ int cdCmd(int sockfd, char* buf, char* cwd) {
 
 void lsCmd(int sockfd) {
     // 参数校验
-    int recv_stat = 0;
-    recv(sockfd, &recv_stat, sizeof(int), MSG_WAITALL);
+    // int recv_stat = 0;
+    // recv(sockfd, &recv_stat, sizeof(int), MSG_WAITALL);
     // 错误处理
-    if (recv_stat == 1) {
-        int info_len = 0;
-        recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
-        char error_info[1000] = {0};
-        recv(sockfd, error_info, info_len, MSG_WAITALL);
-        puts(error_info);
-        return;
-    }
+    // if (recv_stat == 1) {
+    //     int info_len = 0;
+    //     char error_info[1000] = {0};
+    //     recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
+    //     recv(sockfd, error_info, info_len, MSG_WAITALL);
+    //     puts(error_info);
+    //     return;
+    // }
 
     // 接收函数，大火车
     int name_len = 0;

@@ -408,47 +408,53 @@ int cdCmd(Task* task) {
 }
 
 void lsCmd(Task* task) {
+    char data[2] = "1";
+    int res_len = sizeof(Command) + 1;
+    sendn(task->fd, &res_len, sizeof(int));
+    sendn(task->fd, &task->cmd, sizeof(Command));
+    sendn(task->fd, data, 1);
 
-    // 校验参数,发送校验结果，若为错误则继续发送错误信息
-    if (task->args[1] != NULL) {
-        int sendstat = 1;
-        send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
-        char* error_info = "parameter number error";
-        int info_len = strlen(error_info);
-        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-        send(task->fd, error_info, info_len, MSG_NOSIGNAL);
-        log_error("lsCmd: parameter number error");
-        return;
-    } else {
-        int sendstat = 0;
-        send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
-    }
-
-    // 获取当前路径
-    MYSQL* mysql = getDBConnection(task->dbpool); 
-    // int pwdid = getPwdId(mysql, task->uid);
-    int pwdid = 1;
-    char** family = findchild(mysql, pwdid);
-    releaseDBConnection(task->dbpool, mysql);
 
     // bufsize = 4096
     char result[BUFSIZE] = {0};
 
-    while (*family != NULL) {
-        strncat(result, *family, sizeof(result) - strlen(*family) - 1);
-        strncat(result, "\t", sizeof(result) - strlen("\t"));
-        family++;
+    // 校验参数,发送校验结果，若为错误则继续发送错误信息
+    if (task->args[0] != NULL) {
+        // int sendstat = 1;
+        // send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
+
+        char* error_info = "parameter number error";
+        int info_len = strlen(error_info);
+        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+        send(task->fd, error_info, info_len, MSG_NOSIGNAL);
+        
+        log_error("lsCmd: parameter number error");
+    } else {
+        // int sendstat = 0;
+        // send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
+        // 获取当前路径
+        MYSQL* mysql = getDBConnection(task->dbpool); 
+        // int pwdid = getPwdId(mysql, task->uid);
+        int pwdid = 1;
+        char** family = findchild(mysql, pwdid);
+        releaseDBConnection(task->dbpool, mysql);
+
+        while (*family != NULL) {
+            strncat(result, *family, sizeof(result) - strlen(*family) - 1);
+            strncat(result, "\t", sizeof(result) - strlen("\t"));
+            family++;
+        }
+
+        for (int i = 0; family[i] != NULL; ++i) {
+            free(family);
+        }
+        free(family);
+        // 发送（大火车）
+        int info_len = strlen(result);
+        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+        send(task->fd, result, info_len, MSG_NOSIGNAL);
     }
 
-    for (int i = 0; family[i] != NULL; ++i) {
-        free(family);
-    }
-    free(family);
-    
-    // 发送（大火车）
-    int info_len = strlen(result);
-    send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-    send(task->fd, result, info_len, MSG_NOSIGNAL);
 
     return;
 }
@@ -566,7 +572,7 @@ void rmCmd(Task* task) {
     MYSQL *mysql;
     int pwdid;
     pwdid = getPwdId(mysql,task->uid);
-    char pwd = getPwd(mysql,pwdid);
+    //char pwd = getPwd(mysql,pwdid);
     
     char type;
     type = getTypeById(mysql,pwdid);
@@ -747,131 +753,84 @@ int putsCmd(Task* task) {
 }
 
 void mkdirCmd(Task* task) {
+    char data[2] = "1";
+    int res_len = sizeof(Command) + 1;
+    sendn(task->fd, &res_len, sizeof(int));
+    sendn(task->fd, &task->cmd, sizeof(Command));
+    sendn(task->fd, data, 1);
+
 
     if (task->args[0] == NULL || task->args[1] != NULL) {  // missing operand
         char errmsg[MAXLINE] = "mkdir: missing operand";
-        int res_len = strlen(errmsg);
-
-        send(task->fd, errmsg, strlen(errmsg), 0);
+        res_len = strlen(errmsg);
+        send(task->fd, &res_len, sizeof(int), MSG_NOSIGNAL);
+        
+        send(task->fd, errmsg, strlen(errmsg), MSG_NOSIGNAL);
         log_error("mkdirCmd: missing operand");
         error(0, errno, "%d mkdir:", task->fd);
         return;
     }
-    int pwdid = 0;
-    char* mkdir_path = task->args[0];
+
+    MYSQL* mysql = getDBConnection(task->dbpool);
+    int pwdid = getPwdId(mysql, task->uid);            // pwdid
+    char* mkdir_name = task->args[0];                  // name
+    char* pwd = getPwd();
+    char* absolute_path[1024] = {0};              // 绝对路径
+    sprintf(absolute_path, "%s/%s", pwd, mkdir_name);
+    char* type = "d";  // 类型
+
+    int ret = goToRelativeDir(mysql, pwdid, mkdir_name, type);
+    if (ret == 0) {
+        // 不存在, insert
+        int insert_ret = insertRecord(mysql, pwdid, task->uid, NULL, mkdir_name, absolute_path, 
+                    "d", NULL, NULL, '1');
+        releaseDBConnection(task->dbpool, mysql);
+        if (insert_ret == -1) {
+            char* errmsg = "mkdir: insert failed";
+            res_len = strlen(errmsg);
+            send(task->fd, &res_len, sizeof(int), MSG_NOSIGNAL);
+            send(task->fd, errmsg, res_len, MSG_NOSIGNAL);
+            log_error("%s",errmsg);
+        } else {
+            log_info("mkdir: insert succeed");
+        }
+        
+    } else if (ret > 0) {
+        releaseDBConnection(task->dbpool, mysql);
+        // 存在，不能创建
+        char* errmsg = "mkdir: dir already exists";
+        res_len = strlen(errmsg);
+        send(task->fd, &res_len, sizeof(int), MSG_NOSIGNAL);
+        send(task->fd, errmsg, res_len, MSG_NOSIGNAL);
+        log_error("%s",errmsg);
+    } else {
+        // ret < 0 
+        // 目录项存在，exist = 0
+        if (strcmp(type, "d") == 0) { // 是目录，exist改为1
+            const char* query_str = "update nb_vftable set exist = 1 where id = ";
+            char str[16] = {0};
+            sprintf(str, "%d", -ret);
+            char query[1024] = {0};
+            sprintf(query, "%s%s", query_str, str);
+
+            int update_ret = mysql_query(mysql, query);
+            if (update_ret != 0) {
+                log_error("mkdir: mysql_query: %s", strerror(errno));
+                error(1, errno, "mkdir: mysql_query");
+            }else {
+                log_info("mkdir: mysql_query succeed");
+            }
+        } else { // 是文件，不能创建
+            char* errmsg = "mkdir: dirname wrong";
+            res_len = strlen(errmsg);
+            send(task->fd, &res_len, sizeof(int), MSG_NOSIGNAL);
+            send(task->fd, errmsg, res_len, MSG_NOSIGNAL);
+            log_error("%s",errmsg);
+        }
+        releaseDBConnection(task->dbpool, mysql);
+    } 
     
-    // MAX_PATH_LENGTH = 2048
-    char absolute_path[2048] = {0};
-    if (mkdir_path[0] == '/') { 
-        // 返回错误信息
-        // TODO:
-
-    } else if (mkdir_path[0] = '~') {
-        // mkdir 绝对路径
-        strcpy(absolute_path, mkdir_path);
-
-        MYSQL* mysql = getDBConnection(task->dbpool);
-        pwdid = goToRelativeDir(mysql, getPwdId(mysql, task->uid), "~", NULL);
-
-
-
-
-
-
-
-
     
-    } else {  
-        // mkdir 相对路径
-
-
-    }
-
-    // char filename[512] = {0};
-    //     for (char* p = absolute_path; *p != '\0'; ++p) {
-    //         for (char* start = p; *p != '\0' && *p != '/'; ++p) {
-    //             if (*(p + 1) == '/') {
-    //                 bzero(filename, sizeof(filename));
-    //                 strncpy(filename, start, p - start - 1);
-
-
-
-
-
-
-
-
-
-    //             }
-    //         }
-    //     }
-
-
-
-
-
-
-
-
-
-
-
-
-    // // if (sizeof(task ->args[1]) >= 1000) {
-    // //     error(1, 0, "mkdir_dirlen too long!");
-    // // }
-
-    // // 找到当前目录
-    // // bug: 如果在极端情况下，path有1k长度，mkdir_dirlen也有1k长度，会溢出
-    // char curr_path[MAXLINE] = {0};
-    // WorkDir* wd = task->wd_table[task->fd];
-    // strncpy(curr_path, wd->path, strlen(wd->path));
-
-    // int index = wd->index[wd->index[0]];
-    // curr_path[index + 1] = '\0';
-
-    // // 将当前目录和args[1]拼接在一起
-    // char dir[2 * MAXLINE] = {0};
-    // sprintf(dir, "%s/%s", curr_path, task->args[1]);
-
-    // // debug
-    // // printf("wd->index[1] = %d, wd->index[0] = %d\n", wd->index[wd->index[0]],
-    // // wd->index[0]); printf("wdpath = %s\n", wd->path); printf("curpath =
-    // // %s\n", curr_path); printf("dir = %s\n",dir);
-
-    // // 根据dir递归创建目录
-    // // 找每个'/',将其替换成'\0'
-    // for (char* p = dir + 1; *p; ++p) {
-    //     if (*p == '/') {
-    //         // 这里没有跳过多余的'/'，但没有出bug，大概率是mkdir背后做了这个事情
-    //         *p = '\0';
-
-    //         if (mkdir(dir, 0777) && errno != EEXIST) {
-    //             char errmsg[MAXLINE] = "mkdir";
-    //             strncat(errmsg, strerror(errno),
-    //                     sizeof(errmsg) - strlen(strerror(errno)) - 1);
-    //             send(task->fd, errmsg, strlen(errmsg), 0);
-    //             // 后面补日志
-    //             error(0, errno, "%d mkdir:", task->fd);
-    //             return;
-    //         }
-
-    //         *p = '/';
-    //     }
-    // }
-
-    // if (mkdir(dir, 0777) && errno != EEXIST) {
-    //     char errmsg[MAXLINE] = "mkdir";
-    //     strncat(errmsg, strerror(errno),
-    //             sizeof(errmsg) - strlen(strerror(errno)) - 1);
-    //     send(task->fd, errmsg, strlen(errmsg), 0);
-    //     // 后面补日志
-    //     error(0, errno, "%d mkdir:", task->fd);
-    //     return;
-    // }
-
-    // // 成功了给客户端发一个0
-    // send(task->fd, "0", sizeof("0"), 0);
 
     return;
 }
