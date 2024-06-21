@@ -402,13 +402,15 @@ void pwdCmd(Task* task) {
     sendn(task->fd, &task->cmd, sizeof(Command));
     sendn(task->fd, data, 1);
 
-    MYSQL* mysql = getDBConnection(task->dbpool);
-    int pwdid = getPwdId(mysql, task->uid);
-
     char path[MAXLINE] = {0};
     int path_size = MAXLINE;
 
+    MYSQL* mysql = getDBConnection(task->dbpool);
+
+    int pwdid = getPwdId(mysql, task->uid);
     getPwd(mysql, pwdid, path, path_size);
+
+    releaseDBConnection(task->dbpool, mysql);
 
     sendn(task->fd, path, path_size);
 

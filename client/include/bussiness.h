@@ -16,6 +16,9 @@ typedef struct {
     // int splice_size;   // 文件切片大小
 } Task;
 
+Task* getNewConnectionTask(Command cmd, char* res_data);
+void freeTask(Task* task);
+
 int sendn(int sockfd, void* buf, int length);
 int recvn(int sockfd, void* buf, int length);
 
@@ -23,13 +26,12 @@ void sendFile(int sockfd, int fd);
 void recvFile(int sockfd);
 
 int cdCmd(int sockfd, char* buf, char* cwd);
-void lsCmd(int sockfd);
-void pwdCmd(char* buf);
-void getsCmd(int sockfd);
-void mkdirCmd(int sockfd, char* buf);
-void rmCmd(int sockfd, char* buf);
-void putsCmd(int sockfd, char** args);
-void exitCmd(char* buf);
+int lsCmd(int sockfd);
+int pwdCmd(int sockfd);
+int getsCmd(int sockfd);
+int mkdirCmd(int sockfd, char* buf);
+int rmCmd(int sockfd, char* buf);
+int putsCmd(int sockfd, char** args);
 
 void unknownCmd(char* buf);
 
