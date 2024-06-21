@@ -6,7 +6,6 @@
 #include "network.h"
 #include "parser.h"
 #include "threadpool.h"
-#include "dbpool.h"
 
 typedef struct {
     char port[8];
@@ -16,8 +15,5 @@ typedef struct {
 void serverInit(ServerConfig* conf, HashTable* ht);
 int serverMain(ServerConfig* conf, HashTable* ht);
 int serverExit(ThreadPool* pool);
-
-void requestHandler(int connfd, ThreadPool* pool, int* user_table,
-                    DBConnectionPool* dbpool, WorkDir** workdir_table);
 
 #endif

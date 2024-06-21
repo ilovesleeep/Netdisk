@@ -7,22 +7,6 @@
 #define NUM_THREADS 4
 #define MAXEVENTS 1024
 
-int main_bak(int argc, char* argv[]) {
-    if (argc != 3) {
-        error(1, 0, "Usage: %s [host] [port]\n", argv[0]);
-    }
-
-    int sockfd = tcpConnect(argv[1], argv[2]);
-
-    printMenu();
-
-    char username[MAX_NAME_LENGTH + 1] = {0};
-
-    welcome(sockfd, username);
-
-    return sessionHandler(sockfd, argv[1], username);
-}
-
 void welcome(int sockfd, char* username) {
     int option = -1;
     while (option < 0) {
@@ -69,71 +53,6 @@ void welcome(int sockfd, char* username) {
     }
 }
 
-int sessionHandler(int sockfd, char* host, char* user) {
-    char buf[MAXLINE] = {0};
-    char cwd[MAXLINE] = "~";
-    while (1) {
-        printf("\033[32m[%s@%s]:\033[33m%s\033[0m$ ", user, host, cwd);
-        fflush(stdout);
-
-        // 用户输入命令
-        fgets(buf, MAXLINE, stdin);
-
-        // 解析命令
-        char** args = parseRequest(buf);
-        Command cmd = getCommand(args[0]);
-        if (cmd == CMD_UNKNOWN) {
-            freeStringArray(args);
-            continue;
-        } else if (cmd == CMD_EXIT) {
-            freeStringArray(args);
-            close(sockfd);
-            return 0;
-        }
-
-        // 发送命令到服务器
-        // 先发长度
-        int buf_len = strlen(buf);
-        buf[--buf_len] = '\0';  // -1 for '\n'
-        int data_len = sizeof(cmd) + buf_len;
-        sendn(sockfd, &data_len, sizeof(int));
-        // 再发内容
-        sendn(sockfd, &cmd, sizeof(cmd));
-        sendn(sockfd, buf, buf_len);
-
-        // 接收服务器执行的结果
-        bzero(buf, MAXLINE);
-        switch (cmd) {
-            case CMD_CD:
-                cdCmd(sockfd, buf, cwd);
-                break;
-            case CMD_LS:
-                lsCmd(sockfd);
-                break;
-            case CMD_RM:
-                rmCmd(sockfd, buf);
-                break;
-            case CMD_PWD:
-                recv(sockfd, buf, MAXLINE, 0);
-                puts(buf);
-                break;
-            case CMD_GETS:
-                getsCmd(sockfd);
-                break;
-            case CMD_PUTS:
-                putsCmd(sockfd, args);
-                break;
-            case CMD_MKDIR:
-                mkdirCmd(sockfd, buf);
-                break;
-            default:
-                break;
-        }
-        // NOTE: 勿忘我
-        freeStringArray(args);
-    }
-}
-
 void printMenu(void) {
     system("clear");
     /*
@@ -176,6 +95,7 @@ char g_cwd[MAXLINE] = "~";
 static void printPrompt(void) {
     printf("\033[32m[%s@%s]:\033[33m%s\033[0m$ ", g_user, g_host, g_cwd);
     fflush(stdout);
+    return;
 }
 
 int main(int argc, char* argv[]) {
@@ -220,7 +140,6 @@ int main(int argc, char* argv[]) {
         for (int i = 0; i < nready; i++) {
             if (ready_events[i].data.fd == STDIN_FILENO) {
                 // 读入请求
-                log_debug("stdin");
                 char buf[BUFSIZE] = {0};
                 int buf_len = read(STDIN_FILENO, buf, BUFSIZE);
                 buf[--buf_len] = '\0';  // -1 for '\n'
@@ -286,18 +205,17 @@ Task* getNewConnectionTask(Command cmd, char* res_data) {
 }
 
 int shortResponseHandler(int sockfd, Command cmd) {
-    char buf[BUFSIZE] = {0};
     switch (cmd) {
         case CMD_CD:
-            return cdCmd(sockfd, buf, g_cwd);
+            return cdCmd(sockfd, g_cwd);
         case CMD_LS:
             return lsCmd(sockfd);
         case CMD_RM:
-            return rmCmd(sockfd, buf);
+            return rmCmd(sockfd);
         case CMD_PWD:
             return pwdCmd(sockfd);
         case CMD_MKDIR:
-            return mkdirCmd(sockfd, buf);
+            return mkdirCmd(sockfd);
         default:
             return -1;
     }
@@ -324,7 +242,8 @@ int responseHandler(int sockfd, ThreadPool* pool) {
                 case CMD_GETS:
                     task = getNewConnectionTask(cmd, res_data);
                     blockqPush(pool->task_queue, task);
-                    break;
+                    return 0;
+
                 case CMD_CD:
                 case CMD_LS:
                 case CMD_RM:
@@ -333,13 +252,11 @@ int responseHandler(int sockfd, ThreadPool* pool) {
                     shortResponseHandler(sockfd, cmd);
                     printPrompt();
                     return 0;
+
                 default:
                     printPrompt();
                     return 0;
             }
-            // 只有长命令才能走到这里
-            blockqPush(pool->task_queue, task);
-            return 0;
         }
     }
 

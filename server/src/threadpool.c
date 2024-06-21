@@ -26,7 +26,7 @@ void* eventLoop(void* arg) {
         char buf[MAXLINE];
         bzero(buf, MAXLINE);
         int retval = taskHandler(task);
-        taskFree(task);
+        freeTask(task);
 
         log_debug("%lu Ura! Waiting orders.\n", tid);
 

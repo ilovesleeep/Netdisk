@@ -1,8 +1,8 @@
 #ifndef __NB_BLOCKQ_H
 #define __NB_BLOCKQ_H
 
-#include "bussiness.h"
 #include "head.h"
+#include "task.h"
 
 #define N 1024
 
