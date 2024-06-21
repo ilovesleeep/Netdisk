@@ -67,12 +67,12 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* name,char *type) {
         // 初始化绑定参数
         MYSQL_BIND bind[2];
         bzero(bind, sizeof(bind));
-        
+
         bind[0].buffer_type = MYSQL_TYPE_LONG;
         bind[0].buffer = &pwd;
         bind[0].length = NULL;
         bind[0].is_null = 0;
-        
+
         bind[1].buffer_type = MYSQL_TYPE_VARCHAR;
         bind[1].buffer = name;
         bind[1].buffer_length = strlen(sql);
@@ -84,7 +84,6 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* name,char *type) {
         if (res == NULL) {
             return -1;
         }
-
         // 初始化结果绑定参数
         MYSQL_BIND res_bind[2];
 
@@ -120,10 +119,10 @@ int getPwd(MYSQL* mysql, int pwdid, char* path, int path_size){
 
     // 初始化MYSQL_STMT
     MYSQL_STMT *stmt = mysql_stmt_init(mysql);
-    
+
     // 执行PREPARE操作
     const char *sql = "SELECT path FROM nb_vftable WHERE id = ?";
-    
+
     int ret = mysql_stmt_prepare(stmt, sql, strlen(sql));
     if (ret) {
         fprintf(stderr, "%s\n", mysql_error(mysql));
@@ -134,7 +133,7 @@ int getPwd(MYSQL* mysql, int pwdid, char* path, int path_size){
     int id = 0;
     MYSQL_BIND bind;
     bzero(&bind, sizeof(bind));
-    
+
     // 绑定参数
     bind.buffer_type = MYSQL_TYPE_LONG;
     bind.buffer = &id;
@@ -158,26 +157,33 @@ int getPwd(MYSQL* mysql, int pwdid, char* path, int path_size){
 
     // 先获取field字段
     MYSQL_RES *res = mysql_stmt_result_metadata(stmt);
-    if (res) {
-        return -1;
-    }
 
     // 设置输出参数
-    
     MYSQL_BIND res_bind;
     bzero(&res_bind, sizeof(res_bind));
 
     // 绑定输出参数
-    res_bind.buffer_type = MYSQL_TYPE_STRING;
+    res_bind.buffer_type = MYSQL_TYPE_VAR_STRING;
     res_bind.buffer = path;
     res_bind.buffer_length = path_size; 
-    
+
     // 执行绑定操作
     mysql_stmt_bind_result(stmt, &res_bind);
 
     // 再获取数据信息
     mysql_stmt_store_result(stmt);
-    
+    //真正获取数据时，不是用MYSQL_RES来操作了
+    while(1) {
+        //每当调用一次mysql_stmt_fetch函数
+        //res_bind中的绑定的字段就会被填充
+        int status = mysql_stmt_fetch(stmt);
+        if(status == 1 || status == MYSQL_NO_DATA) {
+            break;
+        }
+        //打印一行数据
+        log_debug("path: %s", path);
+
+    } 
     mysql_stmt_free_result(stmt);
     mysql_stmt_close(stmt);
 
@@ -185,7 +191,7 @@ int getPwd(MYSQL* mysql, int pwdid, char* path, int path_size){
 }
 
 
-char** findchild(MYSQL* mysql, int pwdid, char type){
+char** findchild(MYSQL* mysql, int pwdid){
     int idx = 0;
     char** family = (char**)calloc(MAX_CHILD_CHARACTER * 4, sizeof(char*));
     if (family == NULL) {

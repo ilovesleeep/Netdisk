@@ -459,103 +459,6 @@ void lsCmd(Task* task) {
     return;
 }
 
-// // 使用单独的函数来实现命令的功能
-// int deleteDir(const char* dir) {
-//     // 打开目录
-//     DIR* stream = opendir(dir);
-//     if (stream == NULL) {
-//         if (errno == ENOENT) {
-//             fprintf(stderr, "rm: 无法删除'%s' : 没有那个文件或者目录\n",
-//             dir); return errno;
-//         }
-//     }
-
-//     // 遍历目录流，依次删除每一个目录项
-//     errno = 0;
-//     struct dirent* pdirent;
-//     while ((pdirent = readdir(stream)) != NULL) {
-//         // 忽略.和..
-//         char* name = pdirent->d_name;
-//         if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
-//             continue;
-//         }
-
-//         // 注意，这里才开始拼接路径
-//         char subpath[MAXLINE];
-//         sprintf(subpath, "%s/%s", dir, name);
-//         if (pdirent->d_type == DT_DIR) {
-//             // 拼接路径
-//             deleteDir(subpath);
-//         } else if (pdirent->d_type == DT_REG) {
-//             unlink(subpath);
-//         }
-//     }
-
-//     // 关闭目录流
-//     closedir(stream);
-
-//     if (errno) {
-//         error(1, errno, "readdir");
-//     }
-//     // 再删除该目录
-//     rmdir(dir);
-
-//     return 0;
-// }
-
-// void rmCmd(Task* task) {
-//     // TODO:
-//     // 删除每一个目录项
-//     // 校验参数，发送校验结果，若为错误则发送错误信息
-//     if (task->args[2] != NULL) {
-//         int sendstat = 1;  // 错误
-//         send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
-//         char error_info[] = "parameter number error";
-//         int info_len = strlen(error_info);
-//         send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-//         send(task->fd, error_info, info_len, MSG_NOSIGNAL);
-//         return;
-//     } else {
-//         int sendstat = 0;  // 正确
-//         send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
-//     }
-
-//     // 获取当前路径
-//     char curr_path[MAXLINE] = {0};
-//     WorkDir* wd = task->wd_table[task->fd];
-//     strncpy(curr_path, wd->path, strlen(wd->path));
-
-//     // 拼接路径
-//     char dir[2 * MAXLINE] = {0};
-//     sprintf(dir, "%s/%s", curr_path, task->args[1]);
-
-//     // 使用deleteDir函数删除文件
-//     int errnum;
-//     if (remove(dir) == 0) {
-//         printf("Successfully deleted %s\n", dir);
-//         int send_stat = 0;
-//         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-//     } else if ((errnum = deleteDir(dir)) == 0) {
-//         printf("Successfully deleted %s\n", dir);
-//         int send_stat = 0;
-//         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-//     }
-
-//     // 如果删除不存在的目录，则返回报错信息
-//     int send_status = 1;
-//     char msg[MAXLINE] = {0};
-//     if (errnum == ENOENT) {
-//         send(task->fd, &send_status, sizeof(int), MSG_NOSIGNAL);
-//         strcpy(msg, strerror(errno));
-//         int info_len = strlen(msg);
-//         send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-//         send(task->fd, msg, info_len, MSG_NOSIGNAL);
-//         return;
-//     }
-
-//     return;
-// }
-
 int deleteDir(int id,char *type){
 
 
@@ -597,12 +500,24 @@ void rmCmd(Task* task) {
 }
 
 void pwdCmd(Task* task) {
-    // TODO:
-    char path[MAXLINE] = {0};
-    WorkDir* wd = task->wd_table[task->fd];
-    strncpy(path, wd->path, strlen(wd->path));
+    
+    //char data[2]="1";
+    //int res_len =sizeof(Command) + 1;
+    //sendn(task->fd,&res_len, sizeof(int));
+    //sendn(task->fd,&task->cmd,sizeof(Command));
+    //sendn(task->fd, data, 1);
 
-    sendn(task->fd, path, sizeof(path));
+    MYSQL* mysql = getDBConnection(task->dbpool);
+    int pwdid = getPwdId(mysql, task->uid);
+    
+    char path[MAXLINE] = {0};
+    int path_size = MAXLINE;
+
+    getPwd(mysql, pwdid, path, path_size);
+
+    sendn(task->fd, path, path_size);
+    
+    log_debug("pwd: %s",path);
 
     return;
 }
@@ -637,8 +552,8 @@ int getsCmd(Task* task) {
                 if(*(p + 1) == '/'){
                     bzero(file_name, sizeof(file_name));
                     strncpy(file_name, start, p - start + 1);
-                    target_pwdid =
-                        goToRelativeDir(mysql, target_pwdid, file_name);
+                    // target_pwdid =
+                    //     goToRelativeDir(mysql, target_pwdid, file_name);
                     if (target_pwdid == -1) {
                         // 路径错误
                         //***消息对接***
@@ -960,7 +875,7 @@ void regCheck2(Task* task) {
     int uid = userInsert(pconn, username, cryptpasswd, pwdid);
 
     // 插入用户目录记录到 nb_vftable
-    pwdid = insertRecord(pconn, -1, uid, NULL, "home", "/", 'd', NULL, NULL);
+    pwdid = insertRecord(pconn, -1, uid, NULL, "home", "/", 'd', NULL, NULL, '1');
     if (pwdid == -1) {
         log_error("insertRecord failed");
         exit(EXIT_FAILURE);
@@ -1003,7 +918,7 @@ int taskHandler(Task* task) {
             lsCmd(task);
             break;
         case CMD_RM:
-            rmCmd(task);
+            // rmCmd(task);
             break;
         case CMD_PWD:
             pwdCmd(task);
