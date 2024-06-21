@@ -41,12 +41,14 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* name, char* type) {
         mysql_query(mysql, sql);
         MYSQL_RES* res = mysql_store_result(mysql);
         MYSQL_ROW row;
-        mysql_fetch_row(res);
+        row = mysql_fetch_row(res);
         retval = atoi(row[0]);
         if (retval == -1) {
             retval = 0;
         }
-        *type = 'd';
+        if(type){
+            *type = 'd';
+        }
         mysql_free_result(res);
     } else if (strcmp(name, "~") == 0) {
         // 查找家目录

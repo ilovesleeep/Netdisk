@@ -126,8 +126,8 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
     // 查看是否有同名文件
     char type = '\0';
     int file_id = goToRelativeDir(mysql, p_id, block.data, &type);
-    if (file_id != 0 && type == 'd' || file_id > 0) {
-        // 已存在目录 || 文件已存在
+    if((file_id != 0 && type == 'd') || file_id > 0){
+        //已存在目录 || 文件已存在
         int send_stat = 1;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
         char send_info[] = "illegal file name";
@@ -239,41 +239,85 @@ static int touchClient(Task* task) {
 }
 
 int cdCmd(Task* task) {
-    // 告知客户端，接受当前命令的响应
-    touchClient(task);
-
-    int status_code = 0;
-    char res[MAXLINE] = {0};
-    int uid = task->uid;
-
-    // 检查参数个数是否合法
-    if (task->args[2] != NULL) {
-        // 不合法
-        status_code = 1;
-        sendn(task->fd, &status_code, sizeof(int));
-        strcpy(res, "Parameter at most 1");
-        sendn(task->fd, res, strlen(res));
-        return -1;
-    }
-
-    // 没有参数，回到家目录
-    if (task->args[1] == NULL) {
-        sendn(task->fd, &status_code, sizeof(int));
-        // 获取 uid 家目录 id
-        //
-        // 更新 usertable pwdid
-        //
-        strcpy(res, "/");
-        sendn(task->fd, res, strlen(res));
+    char** parameter = task->args;
+    if( parameter[2] != NULL){
+        //ls不允许多余参数,直接报错
+        int send_stat = 1;
+        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+        char send_info[] = "parameter error";
+        int info_len = strlen(send_info);
+        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+        send(task->fd, send_info, info_len, MSG_NOSIGNAL);
         return 0;
     }
+    MYSQL* mysql = getDBConnection(task->dbpool);
+    int pwdid = getPwdId(mysql, task->uid);
+    if( parameter[1] == NULL){
+        //回家
+        pwdid = goToRelativeDir(mysql, pwdid, "~", NULL);
+        char t[10] = {0};
+        sprintf(t, "%d", pwdid);
+        userUpdate(mysql, task->uid, "pwdid", t);
+        int send_stat = 0;
+        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+        releaseDBConnection(task->dbpool, mysql);
+        return 0;
+    }
+    for(char* p = parameter[1]; *p != '\0'; p++){
+        for(char* start = p; *p != '\0' && *p != '/'; p++){
+            if(*(p + 1) == '/'){
+                char type = '\0';
+                char name[256] = {0};
+                strncpy(name, start, p - start + 1);
+                pwdid = goToRelativeDir(mysql, pwdid, name, &type);
+                if(pwdid <= 0 || type == 'f'){
+                    int send_stat = 1;
+                    send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+                    char send_info[] = "path error";
+                    int info_len = strlen(send_info);
+                    send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+                    send(task->fd, send_info, info_len, MSG_NOSIGNAL);
+                    releaseDBConnection(task->dbpool, mysql);
+                    return 0;
+                }
+            }
+            if(*(p + 1) == '\0'){
+                char type = '\0';
+                char name[256] = {0};
+                strncpy(name, start, p - start + 1);
+                pwdid = goToRelativeDir(mysql, pwdid, name, &type);
+                if(pwdid <= 0 || type == 'f'){
+                    int send_stat = 1;
+                    send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+                    char send_info[] = "path error";
+                    int info_len = strlen(send_info);
+                    send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+                    send(task->fd, send_info, info_len, MSG_NOSIGNAL);
+                    releaseDBConnection(task->dbpool, mysql);
+                    return 0;
+                }
+                else{
+                    char t[10] = {0};
+                    sprintf(t, "%d", pwdid);
+                    if(userUpdate(mysql, task->uid, "pwdid", t) != 0){
+                        int send_stat = 1;
+                        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+                        char send_info[] = "path error";
+                        int info_len = strlen(send_info);
+                        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+                        send(task->fd, send_info, info_len, MSG_NOSIGNAL);
+                    }
+                    else{
+                        int send_stat = 0;
+                        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+                    }
+                    releaseDBConnection(task->dbpool, mysql);
+                    return 0;
+                }
+            }
+        }
+    }
 
-    // 检查目标目录是否存在
-    //
-    // 存在，更新 usertable 的 pwdid
-    // userUpdate();
-    //
-    // 发给客户端目标目录的 path
 
     return 0;
 }
@@ -564,6 +608,7 @@ int getsCmd(Task* task) {
         sendn(task->fd, &f_size, sizeof(off_t));
         if (sendFile(task->fd, fd, f_size) == 1) {
             // sendfile中close了fd,若返回值为1证明连接中断,则不进行剩余发送任务
+            releaseDBConnection(task->dbpool, mysql);
             return 1;
         }
     }
@@ -574,6 +619,7 @@ int getsCmd(Task* task) {
     int info_len = strlen(send_info);
     send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
     send(task->fd, send_info, info_len, MSG_NOSIGNAL);
+    releaseDBConnection(task->dbpool, mysql);
     return 0;
 }
 
