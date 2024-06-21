@@ -609,7 +609,7 @@ int getsCmd(Task* task) {
                     char type;
                     target_pwdid =
                         goToRelativeDir(mysql, target_pwdid, file_name, &type);
-                    if (type == 'D') {
+                    if (type == 'd') {
                         // 最后文件名对应的是一个路径,本网盘暂不支持传输文件夹功能
                         //***消息对接***
                         int send_stat = 1;
@@ -627,10 +627,10 @@ int getsCmd(Task* task) {
                 }
             }
         }
-        // 此时file_name即文件名,target_pwdid为待插入项的id
+        // 此时file_name即文件名,target_pwdid为待发送的id
         // 检查文件是否完整(不用检查了,我只会将完整的文件目录项设为1)
-
-        char* path_file = NULL;
+        
+        getFileInfo(mysql, target_pwdid, )
         int fd = open(path_file, O_RDWR);
         // 检查文件是否存在
         // 不存在
@@ -691,12 +691,12 @@ int putsCmd(Task* task) {
             break;
         }
 
-        if (recvFile(task->fd, mysql) == 1) {
+        if (recvFile(task->fd, mysql, task->uid) == 1) {
             retval = 1;
             break;
         }
     }
-    releaseDBConnection(task->dbpool, mysql, task->uid);
+    releaseDBConnection(task->dbpool, mysql);
     return retval;
 }
 
