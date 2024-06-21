@@ -33,12 +33,13 @@ void workdirFree(WorkDir* workdir_tabled);
 int sendn(int sockfd, void* buf, int length);
 int recvn(int sockfd, void* buf, int length);
 
-int sendFile(int sockfd, int fd);
-int recvFile(int sockfd, char* path);
+int sendFile(int sockfd, int fd, off_t f_size);
+int recvFile(int sockfd, MYSQL* mysql, int uid);
 
 int cdCmd(Task* task);
 void lsCmd(Task* task);
-int deleteDir(int id,char *type);
+int delFileOrDir(int pwdid);
+int rmCmdHelper(int uid,int pwdid,char *name,char type);
 void rmCmd(Task* task);
 void pwdCmd(Task* task);
 int getsCmd(Task* task);
