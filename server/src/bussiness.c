@@ -147,7 +147,7 @@ int sendFile(int sockfd, int fd, off_t f_size) {
 int recvFile(int sockfd, MYSQL* mysql, int u_id) {
     int p_id = getPwdId(mysql, u_id);
     char path[1024] = {0}; 
-    getPwd(mysql, p_id, path);
+    getPwd(mysql, p_id, path, 1024);
     // 接收文件名
     DataBlock block;
     bzero(&block, sizeof(block));
@@ -609,7 +609,7 @@ int getsCmd(Task* task) {
                     char type;
                     target_pwdid =
                         goToRelativeDir(mysql, target_pwdid, file_name, &type);
-                    if (type == 'D') {
+                    if (type == 'd') {
                         // 最后文件名对应的是一个路径,本网盘暂不支持传输文件夹功能
                         //***消息对接***
                         int send_stat = 1;
@@ -627,24 +627,13 @@ int getsCmd(Task* task) {
                 }
             }
         }
-        // 此时file_name即文件名,target_pwdid为待插入项的id
+        // 此时file_name即文件名,target_pwdid为待发送的id
         // 检查文件是否完整(不用检查了,我只会将完整的文件目录项设为1)
-
-        char* path_file = NULL;
-        int fd = open(path_file, O_RDWR);
-        // 检查文件是否存在
-        // 不存在
-        if (fd == -1) {
-            int send_stat = 1;
-            send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-
-            char error_info[1000] = {0};
-            sprintf(error_info, "%s%d", "no such file : file number : ", i);
-            int info_len = strlen(error_info);
-            send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-            send(task->fd, error_info, info_len, MSG_NOSIGNAL);
-            return 0;
-        }
+        off_t f_size;
+        off_t c_size;
+        char f_hash[17] = {0};
+        getFileInfo(mysql, target_pwdid, f_hash, &f_size, &c_size);
+        int fd = open(f_hash, O_RDWR);
         // 存在
         int send_stat = 0;
         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
@@ -676,7 +665,6 @@ int putsCmd(Task* task) {
     int recv_stat = 0;
     send(task->fd, &recv_stat, sizeof(int), MSG_NOSIGNAL);
 
-    MYSQL* mysql = getDBConnection(task->dbpool);
     int retval = 0;
     for (int i = 0; true; i++) {
         // 先接收是否要发送
@@ -691,12 +679,12 @@ int putsCmd(Task* task) {
             break;
         }
 
-        if (recvFile(task->fd, mysql) == 1) {
+        if (recvFile(task->fd, mysql, task->uid) == 1) {
             retval = 1;
             break;
         }
     }
-    releaseDBConnection(task->dbpool, mysql, task->uid);
+    releaseDBConnection(task->dbpool, mysql);
     return retval;
 }
 
