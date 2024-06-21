@@ -46,13 +46,18 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* name,char *type) {
         MYSQL_ROW row;
         mysql_fetch_row(res);
         retval = atoi(row[0]);
+        if(retval == -1){
+            retval = 0;
+        }
+        *type = 'd';
         mysql_free_result(res);
     } else if (strcmp(name, "~") == 0) {
         // 查找家目录
-        while ((pwd = goToRelativeDir(mysql, pwd, "..",NULL) != -1)) {
+        while ((pwd = goToRelativeDir(mysql, pwd, "..",NULL) != 0)) {
             retval = pwd;
         }
     } else {
+/*
         // 查找指定目录项
         char sql[] =
             "select id, type, exist from nb_vftable where p_id = ? and name = ?";
@@ -72,17 +77,14 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* name,char *type) {
         bind[0].length = NULL;
         bind[0].is_null = 0;
 
-        bind[1].buffer_type = MYSQL_TYPE_VARCHAR;
+        bind[1].buffer_type = MYSQL_TYPE_VAR_STRING;
         bind[1].buffer = name;
-        bind[1].buffer_length = strlen(sql);
+        unsigned long buf_len = strlen(name);
+        bind[1].length = &buf_len;
         bind[1].is_null = 0;
-        mysql_stmt_bind_param(stmt, bind);
+        ret = mysql_stmt_bind_param(stmt, bind);
 
-        mysql_stmt_execute(stmt);
-        MYSQL_RES* res = mysql_stmt_result_metadata(stmt);
-        if (res == NULL) {
-            return 0;
-        }
+        ret = mysql_stmt_execute(stmt);
         // 初始化结果绑定参数
         MYSQL_BIND res_bind[3];
 
@@ -90,14 +92,14 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* name,char *type) {
         res_bind[0].buffer = &retval;
         res_bind[0].buffer_length = sizeof(int);
 
-        char res_type = '\0';
+        char res_type[10] = {'\0'};
         res_bind[1].buffer_type = MYSQL_TYPE_STRING;
-        res_bind[1].buffer = &res_type;
+        res_bind[1].buffer = res_type;
         res_bind[1].buffer_length = sizeof(res_type);
 
-        char res_exist = '\0';
+        char res_exist[10] = {'\0'};
         res_bind[2].buffer_type = MYSQL_TYPE_STRING;
-        res_bind[2].buffer = &res_exist;
+        res_bind[2].buffer = res_exist;
         res_bind[2].buffer_length = sizeof(res_exist);
         ret = mysql_stmt_bind_result(stmt, res_bind);
 
@@ -117,6 +119,22 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* name,char *type) {
             *type = res_type;
         }
         // type为'D'时retval已完成赋值,直接返回即可
+        mysql_stmt_free_result(stmt);
+*/
+        char sql[1024] = {0};
+        sprintf(sql, "select id, type, exist from nb_vftable where p_id = %d and name = '%s'", pwd, name);
+        int ret = mysql_query(mysql, sql);
+        MYSQL_RES* res = mysql_store_result(mysql);
+        MYSQL_ROW row = mysql_fetch_row(res);
+        if(row != NULL){
+            retval = atoi(row[0]);
+            *type = row[1][0];
+            char exist = row[2][0];
+            if(exist == '0'){
+                retval = -retval;
+            }
+        }
+        mysql_free_result(res);
     }
     return retval;
 }
@@ -292,7 +310,7 @@ int insertRecord(MYSQL* mysql, int p_id, int u_id, char* f_hash, char* name,
 
 int getFileInfo(MYSQL* mysql, int pwdid, char* f_hash, off_t* f_size, off_t* c_size){
     char sql[100] = {0};
-    sprintf(sql, "%s", "SELECT f_hash, f_size, c_size FROM nb_vftable WHERE id = pwdid");
+    sprintf(sql, "SELECT f_hash, f_size, c_size FROM nb_vftable WHERE id = %d", pwdid);
     mysql_query(mysql, sql);
     MYSQL_RES* res = mysql_store_result(mysql);
     MYSQL_ROW row = mysql_fetch_row(res);
