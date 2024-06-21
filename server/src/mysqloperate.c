@@ -16,11 +16,11 @@ int getPwdId(MYSQL* mysql, int uid) {
     return pwdid;
 }
 
-// 根据传入的id，返回文件的类型
+// 根据传入的目录id，返回文件的类型
 char getTypeById(MYSQL* mysql, int id) {
     char f_type;
     char sql[60] = {};
-    sprintf(sql, "select Type from vftable where id=%d", id);
+    sprintf(sql, "select Type from nb_vftable where id=%d", id);
     mysql_query(mysql, sql);
     MYSQL_RES* res = mysql_store_result(mysql);
     MYSQL_ROW row;
@@ -52,8 +52,8 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* name, char* type) {
     } else {
         // 查找指定目录项
         char sql[] =
-            "select id, type from nb_vftable where p_id = ? and name = ? and "
-            "exist = 1";
+            "select id, type, exist from nb_vftable where p_id = ? and name = "
+            "?";
         // 初始化stmt语句
         MYSQL_STMT* stmt = mysql_stmt_init(mysql);
         int ret = mysql_stmt_prepare(stmt, sql, strlen(sql));
@@ -79,19 +79,24 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* name, char* type) {
         mysql_stmt_execute(stmt);
         MYSQL_RES* res = mysql_stmt_result_metadata(stmt);
         if (res == NULL) {
-            return -1;
+            return 0;
         }
         // 初始化结果绑定参数
-        MYSQL_BIND res_bind[2];
+        MYSQL_BIND res_bind[3];
 
-        bind[0].buffer_type = MYSQL_TYPE_LONG;
-        bind[0].buffer = &retval;
-        bind[0].buffer_length = sizeof(int);
+        res_bind[0].buffer_type = MYSQL_TYPE_LONG;
+        res_bind[0].buffer = &retval;
+        res_bind[0].buffer_length = sizeof(int);
 
         char res_type = '\0';
-        bind[1].buffer_type = MYSQL_TYPE_STRING;
-        bind[1].buffer = &res_type;
-        bind[1].buffer_length = sizeof(res_type);
+        res_bind[1].buffer_type = MYSQL_TYPE_VAR_STRING;
+        res_bind[1].buffer = &res_type;
+        res_bind[1].buffer_length = sizeof(res_type);
+
+        char res_exist = '\0';
+        res_bind[2].buffer_type = MYSQL_TYPE_VAR_STRING;
+        res_bind[2].buffer = &res_exist;
+        res_bind[2].buffer_length = sizeof(res_exist);
 
         ret = mysql_stmt_bind_result(stmt, res_bind);
 
@@ -101,7 +106,9 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* name, char* type) {
         ret = mysql_stmt_fetch(stmt);
         if (ret == 1 || ret == MYSQL_NO_DATA) {
             fprintf(stderr, "%s", mysql_error(mysql));
-            retval = -1;
+            retval = 0;
+        } else if (res_exist == '0') {
+            retval = -retval;
         }
 
         if (type != NULL) {
