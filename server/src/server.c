@@ -60,6 +60,7 @@ static void exitHandler(int signo) {
 }
 
 int serverMain(ServerConfig* conf, HashTable* ht) {
+#if 0
     pipe(g_exit_pipe);
     pid_t pid = fork();
     switch (pid) {
@@ -80,10 +81,10 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
             exit(0);
     }
     // 子进程
-    chdir("./user");
     log_info("%d Kirov process reporting", getpid());
     close(g_exit_pipe[1]);
-
+#endif
+    chdir("./user");
     // epoll
     int epfd = epoll_create(1);
 
@@ -105,7 +106,7 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
     epollAdd(epfd, listenfd);
 
     struct epoll_event* ready_events =
-        (struct epoll_event*)calloc(MAXEVENTS, sizeof(struct epoll_event));
+            (struct epoll_event*)calloc(MAXEVENTS, sizeof(struct epoll_event));
 
     // 存储用户 id
     int user_table[MAXUSER] = {0};

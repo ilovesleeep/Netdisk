@@ -25,7 +25,7 @@ char getTypeById(MYSQL* mysql, int id) {
     MYSQL_RES* res = mysql_store_result(mysql);
     MYSQL_ROW row;
     row = mysql_fetch_row(res);
-    f_type = *row[0];
+    f_type = row[0][0];
     mysql_free_result(res);
 
     return f_type;
@@ -41,16 +41,18 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* name, char* type) {
         mysql_query(mysql, sql);
         MYSQL_RES* res = mysql_store_result(mysql);
         MYSQL_ROW row;
-        mysql_fetch_row(res);
+        row = mysql_fetch_row(res);
         retval = atoi(row[0]);
         if (retval == -1) {
             retval = 0;
         }
-        *type = 'd';
+        if(type){
+            *type = 'd';
+        }
         mysql_free_result(res);
     } else if (strcmp(name, "~") == 0) {
         // 查找家目录
-        while ((pwd = goToRelativeDir(mysql, pwd, "..", NULL) != 0)) {
+        while ((pwd = goToRelativeDir(mysql, pwd, "..", NULL)) != 0) {
             retval = pwd;
         }
     } else {
@@ -399,7 +401,7 @@ int localFile(MYSQL* mysql, char* f_hash, off_t* f_size, off_t* c_size) {
 
 // 想修改的就传入指针,不想更改的就传NULL
 int updateRecord(MYSQL* mysql, int pwdid, const int* p_id, const int* u_id,
-                 const char* f_hash, const char* type, const off_t* f_size,
+                 const unsigned char* f_hash, const char* type, const off_t* f_size,
                  const off_t* c_size, const char* exist) {
     int i = 0;
     char sql[256] = "UPDATE nb_vftable SET ";

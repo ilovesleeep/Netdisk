@@ -287,13 +287,19 @@ int cdCmd(int sockfd, char* cwd) {
     char buf[MAXLINE] = {0};
     recvn(sockfd, &recv_stat, sizeof(int));
     if (recv_stat) {
-        recv(sockfd, buf, MAXLINE, 0);
+        int info_len = 0;
+        recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
+        char buf[MAXLINE] = {0};
+        recv(sockfd, buf, info_len, MSG_WAITALL);
         printf("Error: %s\n", buf);
         return -1;
     }
-
-    bzero(cwd, MAXLINE);
-    recv(sockfd, cwd, MAXLINE, 0);
+    else{
+        int pwd_len = 0;
+        bzero(cwd, MAXLINE);
+        recv(sockfd, &pwd_len, sizeof(int), MSG_WAITALL);
+        recv(sockfd, cwd, pwd_len, MSG_WAITALL);
+    }
     return 0;
 }
 
