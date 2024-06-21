@@ -125,7 +125,7 @@ int sessionHandler(int sockfd, char* host, char* user) {
                 putsCmd(sockfd, args);
                 break;
             case CMD_MKDIR:
-                mkdirCmd(sockfd, buf);
+                mkdirCmd(sockfd);
                 break;
             default:
                 break;
