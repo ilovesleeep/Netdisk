@@ -557,46 +557,67 @@ int deleteDir(int id,char *type){
 }
 
 
-void rmCmd(Task* task) {
+//void rmCmd(Task* task) {
+//    // TODO:
+//    // 删除文件及目录。
+//    // 如果删除的是文件，则直接将它的exist设为“0”。
+//    // 如果删除的是目录，则需要查看它是否存在子目录。需要遍历父目录id，找到和本目录id相等的行。
+//    // 并且递归查询下去，直到找到一个目录项不是当前目录id为止，并将它们的exist类型都设置为“0”。
+//    MYSQL *mysql;
+//    int pwdid;
+//    pwdid = getPwdId(mysql,task->uid);
+//    char pwd = getPwd(mysql,pwdid);
+//    
+//    char type;
+//    type = getTypeById(mysql,pwdid);
+//     
+//    // // 获取类型
+//    // if(strcmp(type,'f') == 0){
+//    //     // 类型为file
+//    //     char sql[60] = {0};
+//    //     sprintf(sql,"update nb_netdisk set exist='0' where id=%d",pwdid);
+//    //     int res = mysql_query(mysql,sql);
+//    //     if(res != 0){
+//    //         log_error("set exist='0' failed.");
+//    //         error(1,0,"[ERROR] set exist='0' failed\n");
+//    //     }
+//    // }else if(strcmp(type,'d') == 0){
+//    //     // 类型是directory
+//    //     char **child = findchild(mysql,pwdid);
+//    //     while(*child != NULL){
+//    //         rmCmd(*child)
+//    //     }
+//    // }
+//}
+
+// void pwdCmd(Task* task) {
     // TODO:
-    // 删除文件及目录。
-    // 如果删除的是文件，则直接将它的exist设为“0”。
-    // 如果删除的是目录，则需要查看它是否存在子目录。需要遍历父目录id，找到和本目录id相等的行。
-    // 并且递归查询下去，直到找到一个目录项不是当前目录id为止，并将它们的exist类型都设置为“0”。
-    MYSQL *mysql;
-    int pwdid;
-    pwdid = getPwdId(mysql,task->uid);
-    char pwd = getPwd(mysql,pwdid);
-    
-    char type;
-    type = getTypeById(mysql,pwdid);
-     
-    // // 获取类型
-    // if(strcmp(type,'f') == 0){
-    //     // 类型为file
-    //     char sql[60] = {0};
-    //     sprintf(sql,"update nb_netdisk set exist='0' where id=%d",pwdid);
-    //     int res = mysql_query(mysql,sql);
-    //     if(res != 0){
-    //         log_error("set exist='0' failed.");
-    //         error(1,0,"[ERROR] set exist='0' failed\n");
-    //     }
-    // }else if(strcmp(type,'d') == 0){
-    //     // 类型是directory
-    //     char **child = findchild(mysql,pwdid);
-    //     while(*child != NULL){
-    //         rmCmd(*child)
-    //     }
-    // }
-}
+    // char path[MAXLINE] = {0};
+    // WorkDir* wd = task->wd_table[task->fd];
+    // strncpy(path, wd->path, strlen(wd->path));
+
+    // sendn(task->fd, path, sizeof(path));
+
+    // return;
+// }
 
 void pwdCmd(Task* task) {
-    // TODO:
-    char path[MAXLINE] = {0};
-    WorkDir* wd = task->wd_table[task->fd];
-    strncpy(path, wd->path, strlen(wd->path));
+    
+    char data[2]="1";
+    int res_len =sizeof(Command) + 1;
+    sendn(task->fd,&res_len, sizeof(int));
+    sendn(task->fd,&task->cmd,sizeof(Command));
+    sendn(task->fd, data, 1);
 
-    sendn(task->fd, path, sizeof(path));
+    MYSQL* mysql = getDBConnection(task->dbpool);
+    int pwdid = getPwdId(mysql, task->uid);
+    
+    char path[MAXLINE] = {0};
+    int path_size = MAXLINE;
+
+    getPwd(mysql, pwdid, path, path_size);
+
+    sendn(task->fd, path, path_size);
 
     return;
 }
@@ -631,8 +652,8 @@ int getsCmd(Task* task) {
                 if(*(p + 1) == '/'){
                     bzero(file_name, sizeof(file_name));
                     strncpy(file_name, start, p - start + 1);
-                    target_pwdid =
-                        goToRelativeDir(mysql, target_pwdid, file_name);
+                    // target_pwdid =
+                    //     goToRelativeDir(mysql, target_pwdid, file_name);
                     if (target_pwdid == -1) {
                         // 路径错误
                         //***消息对接***
@@ -945,7 +966,7 @@ void regCheck2(Task* task) {
     int uid = userInsert(pconn, username, cryptpasswd, pwdid);
 
     // 插入用户目录记录到 nb_vftable
-    pwdid = insertRecord(pconn, -1, uid, NULL, "home", "/", 'd', NULL, NULL);
+    //pwdid = insertRecord(pconn, -1, uid, NULL, "home", "/", 'd', NULL, NULL);
     if (pwdid == -1) {
         log_error("insertRecord failed");
         exit(EXIT_FAILURE);
@@ -988,7 +1009,7 @@ int taskHandler(Task* task) {
             lsCmd(task);
             break;
         case CMD_RM:
-            rmCmd(task);
+            // rmCmd(task);
             break;
         case CMD_PWD:
             pwdCmd(task);
