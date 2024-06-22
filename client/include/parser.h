@@ -15,9 +15,10 @@ typedef enum {
     CMD_REG2,
     CMD_LOGIN1,
     CMD_LOGIN2,
+    CMD_INFO_TOKEN,
     CMD_EXIT,
-    CMD_UNKNOWN,
     CMD_STOP,
+    CMD_UNKNOWN,
 } Command;
 
 char** parseRequest(const char* req);

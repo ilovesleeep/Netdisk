@@ -22,9 +22,9 @@ void* eventLoop(void* arg) {
         log_debug("%lu Da! For mother China!", tid);
 
         if (task->cmd == CMD_PUTS) {
-            // putsHandler(task);
+            // putsHandler(sockfd, task);
         } else {
-            // getsHandler(task);
+            // getsHandler(sockfd, task);
         }
         freeTask(task);
 

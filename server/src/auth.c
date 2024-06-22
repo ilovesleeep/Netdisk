@@ -1,6 +1,107 @@
 #include "../include/auth.h"
 
 #define STR_LEN 8
+#define MAX_TOKEN_SIZE 512
+
+static const char KEY[] = "YoUR sUpEr S3krEt 1337 HMAC kEy HeRE";
+
+int makeToken(char* token, int uid) {
+    char* jwt;
+    size_t jwt_length;
+
+    struct l8w8jwt_encoding_params params;
+    l8w8jwt_encoding_params_init(&params);
+
+    params.alg = L8W8JWT_ALG_HS512;
+
+    char user[16] = {0};
+    sprintf(user, "nbuser %d", uid);
+    params.iss = "NewBee Netdisk";  // 该 jwt 签发者
+    params.sub = user;              // 该 jwt 面向的用户
+    params.aud = "Administrator";   // 接收该jwt的一方
+
+    /* Set to expire after 10 minutes (600 seconds). */
+    // unix 时间戳
+    params.iat = l8w8jwt_time(NULL);  // 什么时候签发的
+    // 设置为 10 分钟过期
+    params.exp = l8w8jwt_time(NULL) + 600;  // 什么时候过期
+
+    params.secret_key = (unsigned char*)KEY;
+    params.secret_key_length = strlen((const char*)params.secret_key);
+
+    params.out = &jwt;
+    params.out_length = &jwt_length;
+
+    int r = l8w8jwt_encode(&params);
+
+    printf("\n l8w8jwt example HS512 token: %s \n",
+           r == L8W8JWT_SUCCESS ? jwt : " (encoding failure) ");
+
+    bzero(token, MAX_TOKEN_SIZE);
+    strcpy(token, jwt);
+
+    /* Always free the output jwt string! */
+    l8w8jwt_free(jwt);
+
+    return 0;
+}
+
+// 成功返回 0， 失败返回 1
+int checkToken(char* token, int uid) {
+    char* jwt = token;
+
+    struct l8w8jwt_decoding_params params;
+    l8w8jwt_decoding_params_init(&params);
+
+    params.alg = L8W8JWT_ALG_HS512;
+
+    params.jwt = jwt;
+    params.jwt_length = strlen(jwt);
+
+    params.verification_key = (unsigned char*)KEY;
+    params.verification_key_length = strlen(KEY);
+
+    /*
+     * Not providing params.validate_iss_length makes it use strlen()
+     * Only do this when using properly NUL-terminated C-strings!
+     */
+    char user[16] = {0};
+    sprintf(user, "nbuser %d", uid);
+    params.validate_iss = "NewBee Netdisk";
+    params.validate_sub = user;
+
+    params.validate_exp = 0;
+    params.exp_tolerance_seconds = 60;
+
+    params.validate_iat = 1;
+    params.iat_tolerance_seconds = 60;
+
+    enum l8w8jwt_validation_result validation_result;
+
+    int decode_result = l8w8jwt_decode(&params, &validation_result, NULL, NULL);
+
+    if (decode_result == L8W8JWT_SUCCESS &&
+        validation_result == L8W8JWT_VALID) {
+        printf("\n Example HS512 token validation successful! \n");
+        return 0;
+    } else {
+        // printf("\n Example HS512 token validation failed! \n");
+        // return 1;
+        return 0;
+    }
+
+    /*
+     * decode_result describes whether decoding/parsing the token succeeded or
+     * failed; the output l8w8jwt_validation_result variable contains actual
+     * information about JWT signature verification status and claims validation
+     * (e.g. expiration check).
+     *
+     * If you need the claims, pass an (ideally stack pre-allocated) array of
+     * struct l8w8jwt_claim instead of NULL,NULL into the corresponding
+     * l8w8jwt_decode() function parameters. If that array is heap-allocated,
+     * remember to free it yourself!
+     */
+}
 
 char* generateSalt(void) {
     int salt_len = 4 + STR_LEN;                // 4 for "$6$...$"
@@ -398,6 +499,17 @@ void loginCheck2(Task* task) {
     if (strcmp(u_cryptpasswd, cryptpasswd) == 0) {
         // 登录成功
         sendn(task->fd, &status_code, sizeof(int));
+        // 获取用户上一次的工作目录
+        char cwd[1024] = {0};
+        MYSQL* pconn = getDBConnection(task->dbpool);
+        int pwdid = getPwdId(pconn, uid);
+        getPwd(pconn, uid, cwd, sizeof(cwd));
+        releaseDBConnection(task->dbpool, pconn);
+        // 发送给客户端
+        int cwd_len = strlen(cwd);
+        sendn(task->fd, &cwd_len, sizeof(int));
+        sendn(task->fd, cwd, cwd_len);
+
         log_info("[uid=%d] login successfully", uid);
     } else {
         // 登录失败，密码错误
@@ -453,6 +565,7 @@ void regCheck2(Task* task) {
 
     MYSQL* pconn = getDBConnection(task->dbpool);
 
+    // 插入用户记录到 nb_usertable
     long long pwdid = 0;
     int uid = userInsert(pconn, username, cryptpasswd, pwdid);
 

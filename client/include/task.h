@@ -10,6 +10,7 @@ typedef struct {
     char* port;
 
     // gets, puts 需要的参数
+    char** args;
 
     // TODO: 方案1：分片+合并
     // char* file;        // 文件名

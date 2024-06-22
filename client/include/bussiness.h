@@ -5,8 +5,6 @@
 #include "parser.h"
 #include "task.h"
 
-Task* getNewConnectionTask(Command cmd, char* res_data);
-
 int sendn(int sockfd, void* buf, int length);
 int recvn(int sockfd, void* buf, int length);
 
