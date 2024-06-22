@@ -47,7 +47,7 @@ int goToRelativeDir(MYSQL* mysql, int pwd, char* name, char* type) {
         if (retval == -1) {
             retval = 0;
         }
-        if(type){
+        if (type) {
             *type = 'd';
         }
         mysql_free_result(res);
@@ -246,7 +246,8 @@ char** findchild(MYSQL* mysql, int pwdid) {
         error(1, errno, "malloc");
     }
 
-    const char* qurey_str = "SELECT name FROM nb_vftable WHERE p_id = ";
+    const char* qurey_str =
+        "SELECT name FROM nb_vftable WHERE exist = '1' AND p_id = ";
     char str[16] = {0};
     sprintf(str, "%d", pwdid);
     char query[1024] = {0};
@@ -403,8 +404,8 @@ int localFile(MYSQL* mysql, char* f_hash, off_t* f_size, off_t* c_size) {
 
 // 想修改的就传入指针,不想更改的就传NULL
 int updateRecord(MYSQL* mysql, int pwdid, const int* p_id, const int* u_id,
-                 const unsigned char* f_hash, const char* type, const off_t* f_size,
-                 const off_t* c_size, const char* exist) {
+                 const unsigned char* f_hash, const char* type,
+                 const off_t* f_size, const off_t* c_size, const char* exist) {
     int i = 0;
     char sql[256] = "UPDATE nb_vftable SET ";
     if (p_id) {

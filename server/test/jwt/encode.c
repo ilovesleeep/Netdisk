@@ -29,6 +29,7 @@ int main(void) {
 
     printf("\n l8w8jwt example HS512 token: %s \n",
            r == L8W8JWT_SUCCESS ? jwt : " (encoding failure) ");
+    printf("len: %ld\n", strlen(jwt));
 
     /* Always free the output jwt string! */
     l8w8jwt_free(jwt);

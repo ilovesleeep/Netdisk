@@ -126,8 +126,8 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
     // 查看是否有同名文件
     char type = '\0';
     int file_id = goToRelativeDir(mysql, p_id, block.data, &type);
-    if((file_id != 0 && type == 'd') || file_id > 0){
-        //已存在目录 || 文件已存在
+    if ((file_id != 0 && type == 'd') || file_id > 0) {
+        // 已存在目录 || 文件已存在
         int send_stat = 1;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
         char send_info[] = "illegal file name";
@@ -241,8 +241,8 @@ static int touchClient(Task* task) {
 int cdCmd(Task* task) {
     touchClient(task);
     char** parameter = task->args;
-    if( parameter[2] != NULL){
-        //ls不允许多余参数,直接报错
+    if (parameter[2] != NULL) {
+        // ls不允许多余参数,直接报错
         int send_stat = 1;
         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
         char send_info[] = "parameter error";
@@ -253,10 +253,10 @@ int cdCmd(Task* task) {
     }
     MYSQL* mysql = getDBConnection(task->dbpool);
     int pwdid = getPwdId(mysql, task->uid);
-    if( parameter[1] == NULL){
-        //回家
+    if (parameter[1] == NULL) {
+        // 回家
         pwdid = goToRelativeDir(mysql, pwdid, "~", NULL);
-        if(pwdid == 0){
+        if (pwdid == 0) {
             int send_stat = 1;
             send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
             char send_info[] = "you already at home";
@@ -273,23 +273,23 @@ int cdCmd(Task* task) {
 
         int send_stat = 0;
         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-        char pwd[10] = {0}; 
+        char pwd[10] = {0};
         getPwd(mysql, pwdid, pwd, sizeof(pwd));
         int pwd_len = strlen(pwd);
         send(task->fd, &pwd_len, sizeof(int), MSG_NOSIGNAL);
         send(task->fd, pwd, pwd_len, MSG_NOSIGNAL);
-        
+
         releaseDBConnection(task->dbpool, mysql);
         return 0;
     }
-    for(char* p = parameter[1]; *p != '\0'; p++){
-        for(char* start = p; *p != '\0' && *p != '/'; p++){
-            if(*(p + 1) == '/'){
+    for (char* p = parameter[1]; *p != '\0'; p++) {
+        for (char* start = p; *p != '\0' && *p != '/'; p++) {
+            if (*(p + 1) == '/') {
                 char type = '\0';
                 char name[256] = {0};
                 strncpy(name, start, p - start + 1);
                 pwdid = goToRelativeDir(mysql, pwdid, name, &type);
-                if(pwdid <= 0 || type == 'f'){
+                if (pwdid <= 0 || type == 'f') {
                     int send_stat = 1;
                     send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
                     char send_info[] = "path error";
@@ -300,12 +300,12 @@ int cdCmd(Task* task) {
                     return 0;
                 }
             }
-            if(*(p + 1) == '\0'){
+            if (*(p + 1) == '\0') {
                 char type = '\0';
                 char name[256] = {0};
                 strncpy(name, start, p - start + 1);
                 pwdid = goToRelativeDir(mysql, pwdid, name, &type);
-                if(pwdid <= 0 || type == 'f'){
+                if (pwdid <= 0 || type == 'f') {
                     int send_stat = 1;
                     send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
                     char send_info[] = "path error";
@@ -314,23 +314,21 @@ int cdCmd(Task* task) {
                     send(task->fd, send_info, info_len, MSG_NOSIGNAL);
                     releaseDBConnection(task->dbpool, mysql);
                     return 0;
-                }
-                else{
+                } else {
                     char t[10] = {0};
                     sprintf(t, "%d", pwdid);
-                    if(userUpdate(mysql, task->uid, "pwdid", t) != 0){
+                    if (userUpdate(mysql, task->uid, "pwdid", t) != 0) {
                         int send_stat = 1;
                         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
                         char send_info[] = "path error";
                         int info_len = strlen(send_info);
                         send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
                         send(task->fd, send_info, info_len, MSG_NOSIGNAL);
-                    }
-                    else{
+                    } else {
                         int send_stat = 0;
                         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
 
-                        char pwd[1024] = {0}; 
+                        char pwd[1024] = {0};
                         getPwd(mysql, pwdid, pwd, sizeof(pwd));
                         int pwd_len = strlen(pwd);
                         send(task->fd, &pwd_len, sizeof(int), MSG_NOSIGNAL);
@@ -342,7 +340,6 @@ int cdCmd(Task* task) {
             }
         }
     }
-
 
     return 0;
 }
@@ -392,7 +389,7 @@ void lsCmd(Task* task) {
     return;
 }
 
-int delFileOrDir(MYSQL *mysql,int pwdid) {
+int delFileOrDir(MYSQL* mysql, int pwdid) {
     // 通过set exist='0'删除文件或目录
     char sql[60] = {0};
     sprintf(sql, "update nb_vftable set exist='0' where id=%d", pwdid);
@@ -406,11 +403,11 @@ int delFileOrDir(MYSQL *mysql,int pwdid) {
 }
 
 // 传入uid,pwdid,name,type,判断传入的是文件还是目录
-int rmCmdHelper(MYSQL *mysql,int uid, int pwdid, char* name, char type) {
+int rmCmdHelper(MYSQL* mysql, int uid, int pwdid, char* name, char type) {
     // 获取类型
     if (type == 'f') {
         // 类型为file,直接删除
-        int res = delFileOrDir(mysql,pwdid);
+        int res = delFileOrDir(mysql, pwdid);
         if (res != 0) {
             log_error("del failed.");
             error(1, 0, "[ERROR] del failed\n");
@@ -423,7 +420,7 @@ int rmCmdHelper(MYSQL *mysql,int uid, int pwdid, char* name, char type) {
         while (*child != NULL) {
             int childpwdid = getPwdId(mysql, uid);
             char type = getTypeById(mysql, childpwdid);
-            int res = rmCmdHelper(mysql,uid, childpwdid, *child, type);
+            int res = rmCmdHelper(mysql, uid, childpwdid, *child, type);
             if (res != 0) {
                 log_error("del failed.");
                 error(1, 0, "[ERROR] del failed\n");
@@ -432,7 +429,7 @@ int rmCmdHelper(MYSQL *mysql,int uid, int pwdid, char* name, char type) {
         }
     }
 
-    int res = delFileOrDir(mysql,pwdid);
+    int res = delFileOrDir(mysql, pwdid);
     if (res != 0) {
         log_error("del failed.");
         error(1, 0, "[ERROR] del failed\n");
@@ -481,7 +478,7 @@ void rmCmd(Task* task) {
     getPwd(mysql, pwdid, pwd, 1024);
     char type = getTypeById(mysql, pwdid);
 
-    int res = rmCmdHelper(mysql,task->uid, pwdid, pwd, type);
+    int res = rmCmdHelper(mysql, task->uid, pwdid, pwd, type);
     if (res != 0) {
         // 错误，未能成功删除
         int send_stat = 1;
@@ -491,7 +488,7 @@ void rmCmd(Task* task) {
         send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
         send(task->fd, error_info, info_len, MSG_NOSIGNAL);
         log_error("rm %s failed.", pwd);
-        releaseDBConnection(task->dbpool,mysql);
+        releaseDBConnection(task->dbpool, mysql);
         error(1, 0, "[ERROR] rm failed\n");
     } else {
         // 成功删除
@@ -500,7 +497,7 @@ void rmCmd(Task* task) {
         send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
     }
 
-    releaseDBConnection(task->dbpool,mysql);
+    releaseDBConnection(task->dbpool, mysql);
     return;
 }
 
@@ -756,10 +753,10 @@ void mkdirCmd(Task* task) {
                 res_len = strlen(errmsg);
                 send(task->fd, &res_len, sizeof(int), MSG_NOSIGNAL);
                 send(task->fd, errmsg, res_len, MSG_NOSIGNAL);
-                
+
                 error(0, errno, "mkdir: mysql_query");
                 log_error("mkdir: mysql_query: %s", strerror(errno));
-            }else {
+            } else {
                 res_len = 0;
                 send(task->fd, &res_len, sizeof(int), MSG_NOSIGNAL);
                 log_info("mkdir: mysql_query succeed");
@@ -780,7 +777,7 @@ void unknownCmd(void) { return; }
 
 int taskHandler(Task* task) {
     int retval = 0;
-    switch (getCommand(task->args[0])) {
+    switch (task->cmd) {
         case CMD_CD:
             cdCmd(task);
             break;

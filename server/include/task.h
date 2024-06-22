@@ -11,6 +11,7 @@ typedef struct {
     Command cmd;
     char** args;
     DBConnectionPool* dbpool;
+    char* token;
 } Task;
 
 void freeTask(Task* task);
