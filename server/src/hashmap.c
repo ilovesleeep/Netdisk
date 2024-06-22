@@ -1,4 +1,4 @@
-#include "hashmap.h"
+#include "../include/hashmap.h"
 
 #define DEFAULT_CAPACITY 13
 #define LOAD_FACTOR 0.75
