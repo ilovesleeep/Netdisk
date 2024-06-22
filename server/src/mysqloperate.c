@@ -5,8 +5,10 @@
 int getPwdId(MYSQL* mysql, int uid) {
     int pwdid;
     char sql[60] = {};
+    mysql_query(mysql, "START TRANSACTION");
     sprintf(sql, "select pwdid from nb_usertable where id=%d", uid);
-    mysql_query(mysql, sql);
+    mysql_query(mysql, "commit");
+    int ret = mysql_query(mysql, sql);
     MYSQL_RES* res = mysql_store_result(mysql);
     MYSQL_ROW row;
     row = mysql_fetch_row(res);
