@@ -17,6 +17,7 @@ typedef enum {
     CMD_REG2,
     CMD_LOGIN1,
     CMD_LOGIN2,
+    CMD_INFO_TOKEN,
     CMD_UNKNOWN,
 } Command;
 

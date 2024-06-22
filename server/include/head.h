@@ -8,6 +8,9 @@
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
+#include <l8w8jwt/decode.h>
+#include <l8w8jwt/encode.h>
+#include <mysql/mysql.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <pthread.h>
@@ -25,8 +28,6 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
-#include <mysql/mysql.h>
-
 
 #define SIZE(a) (sizeof(a) / sizeof(a[0]))
 

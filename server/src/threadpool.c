@@ -1,6 +1,33 @@
 #include "../include/threadpool.h"
 
 #define MAXLINE 1024
+#define MAX_TOKEN_SIZE 512
+
+static int touchClient(Task* task, Command cmd) {
+    char data[2] = "1";
+    int res_len = sizeof(Command) + 1;
+    sendn(task->fd, &res_len, sizeof(int));
+    sendn(task->fd, &cmd, sizeof(Command));
+    sendn(task->fd, data, 1);
+
+    return 0;
+}
+
+static int tellClient(int connfd, int* user_table) {
+    // 告诉客户端需要的连接信息
+    // 生成 token
+    char token[MAX_TOKEN_SIZE] = {0};
+    makeToken(token, user_table[connfd]);
+
+    // 发送连接信息 (host, port, token)
+    char conn_data[1024] = {0};
+    sprintf(conn_data, "%s %s %s", "localhost", "30002", token);
+    int data_len = strlen(conn_data);
+    sendn(connfd, &data_len, sizeof(int));
+    sendn(connfd, conn_data, data_len);
+
+    return 0;
+}
 
 void* eventLoop(void* arg) {
     ThreadPool* pool = (ThreadPool*)arg;
@@ -16,16 +43,33 @@ void* eventLoop(void* arg) {
         }
 
         // 处理业务
-
         int connfd = task->fd;
-        // epollMod(pool->epfd, task->fd, 0);
-        // epollDel(pool->epfd, task->fd);
 
         log_debug("%lu Da! For mother China!", tid);
 
-        char buf[MAXLINE];
-        bzero(buf, MAXLINE);
-        int retval = taskHandler(task);
+        int retval = -1;
+        switch (task->cmd) {
+            case CMD_INFO_TOKEN:
+                // 告知客户端新连接信息和token
+                touchClient(task, CMD_INFO_TOKEN);
+                tellClient(task->fd, task->u_table);
+                break;
+            case CMD_PUTS:
+            case CMD_GETS:
+                if (checkToken(task->token, task->uid) == 0) {
+                    printf("认证成功\n");
+                    taskHandler(task);
+                    break;
+                } else {
+                    printf("认证失败\n");
+                    break;
+                }
+                // taskHandler(task);
+                break;
+            default:
+                taskHandler(task);
+                break;
+        }
         freeTask(task);
 
         log_debug("%lu Ura! Waiting orders.\n", tid);

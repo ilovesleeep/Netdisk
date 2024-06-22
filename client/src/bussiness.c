@@ -284,7 +284,6 @@ int recvFile(int sockfd) {
 
 int cdCmd(int sockfd, char* cwd) {
     int recv_stat = 0;
-    char buf[MAXLINE] = {0};
     recvn(sockfd, &recv_stat, sizeof(int));
     if (recv_stat) {
         int info_len = 0;
@@ -293,8 +292,7 @@ int cdCmd(int sockfd, char* cwd) {
         recv(sockfd, buf, info_len, MSG_WAITALL);
         printf("Error: %s\n", buf);
         return -1;
-    }
-    else{
+    } else {
         int pwd_len = 0;
         bzero(cwd, MAXLINE);
         recv(sockfd, &pwd_len, sizeof(int), MSG_WAITALL);
@@ -303,14 +301,78 @@ int cdCmd(int sockfd, char* cwd) {
     return 0;
 }
 
-int lsCmd(int sockfd) {
+#if 0
+int lsCmd1(int sockfd) {
     char buf[BUFSIZE] = {0};
     int buf_len = 0;
-
     recv(sockfd, &buf_len, sizeof(int), MSG_WAITALL);
-    recv(sockfd, buf, buf_len, MSG_WAITALL);
+    if (buf_len != 0) {
+        char buf[BUFSIZE] = {0};
+        recv(sockfd, buf, buf_len, MSG_WAITALL);
+        printf("%s\n", buf);
+    }
 
-    printf("%s\n", buf);
+    return 0;
+}
+#endif
+
+int lsCmd(int sockfd) {
+    int recv_stat = 0;
+    recv(sockfd, &recv_stat, sizeof(int), MSG_NOSIGNAL);
+
+    // 参数校验的错误处理
+    if (recv_stat == 1) {
+        int info_len = 0;
+        recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
+        char error_info[MAXLINE] = {0};
+        recv(sockfd, error_info, info_len, MSG_WAITALL);
+        puts(error_info);
+        return 0;
+    }
+
+    recv(sockfd, &recv_stat, sizeof(int), MSG_WAITALL);
+    switch (recv_stat) {
+        case 0:
+            for (;;) {
+                char type = '\0';
+                recv(sockfd, &type, 1, 0);
+                if (type == '\0') {
+                    printf("\n");
+                    break;
+                }
+                int info_len = 0;
+                recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
+                char name[256] = {0};
+                recv(sockfd, name, info_len, MSG_WAITALL);
+                if (type == 'f') {
+                    printf("\033[0m%s\t", name);
+                } else if (type == 'd') {
+                    printf("\033[34m%s\t", name);
+                }
+            }
+            break;
+        case 1:
+            for (;;) {
+                char type = '\0';
+                recv(sockfd, &type, 1, 0);
+                if (type == '\0') {
+                    break;
+                }
+                int info_len = 0;
+                recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
+                char name[256] = {0};
+                recv(sockfd, name, info_len, MSG_WAITALL);
+                if (type == 'f') {
+                    printf("\033[0m%s\t", name);
+                    off_t f_size = 0;
+                    recv(sockfd, &f_size, sizeof(off_t), MSG_WAITALL);
+                    printf("%ld\n", f_size);
+                } else if (type == 'd') {
+                    printf("\033[34m%s\n", name);
+                }
+            }
+            break;
+    }
     return 0;
 }
 
@@ -447,6 +509,6 @@ int mkdirCmd(int sockfd) {
         recv(sockfd, filename, name_len, MSG_WAITALL);
         printf("%s\n", filename);
     }
-    
+
     return 0;
 }
