@@ -19,9 +19,10 @@ static int tellClient(int connfd, int* user_table) {
     char token[MAX_TOKEN_SIZE] = {0};
     makeToken(token, user_table[connfd]);
 
-    // 发送连接信息 (host, port, token)
+    // 发送连接信息 (uid, host, port, token)
     char conn_data[1024] = {0};
-    sprintf(conn_data, "%s %s %s", "localhost", "30002", token);
+    sprintf(conn_data, "%d %s %s %s", user_table[connfd], "localhost", "30002",
+            token);
     int data_len = strlen(conn_data);
     sendn(connfd, &data_len, sizeof(int));
     sendn(connfd, conn_data, data_len);
@@ -54,19 +55,31 @@ void* eventLoop(void* arg) {
                 touchClient(task, CMD_INFO_TOKEN);
                 tellClient(task->fd, task->u_table);
                 break;
-            case CMD_PUTS:
-            case CMD_GETS:
+            case CMD_PUTS1:
+            case CMD_GETS1:
                 if (checkToken(task->token, task->uid) == 0) {
-                    printf("认证成功\n");
-                    taskHandler(task);
+                    printf("阶段1 成功\n");
+                    touchClient(task, task->cmd);
                     break;
                 } else {
-                    printf("认证失败\n");
+                    printf("阶段1 失败\n");
                     break;
                 }
-                // taskHandler(task);
-                break;
+            case CMD_PUTS2:
+            case CMD_GETS2:
+                if (checkToken(task->token, task->uid) == 0) {
+                    printf("阶段2 成功\n");
+                    taskHandler(task);
+                    char* tmp = task->cmd == CMD_GETS2 ? "gets" : "puts";
+                    sleep(5);
+                    printf("执行 %s 完成\n", tmp);
+                    break;
+                } else {
+                    printf("阶段2 失败\n");
+                    break;
+                }
             default:
+                // 短命令
                 taskHandler(task);
                 break;
         }

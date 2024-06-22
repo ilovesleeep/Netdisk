@@ -48,9 +48,9 @@ Command getCommand(const char* cmd) {
     } else if (strcmp(cmd, "pwd") == 0) {
         return CMD_PWD;
     } else if (strcmp(cmd, "gets") == 0) {
-        return CMD_GETS;
+        return CMD_GETS1;
     } else if (strcmp(cmd, "puts") == 0) {
-        return CMD_PUTS;
+        return CMD_PUTS1;
     } else if (strcmp(cmd, "exit") == 0) {
         return CMD_EXIT;
     } else if (strcmp(cmd, "mkdir") == 0) {

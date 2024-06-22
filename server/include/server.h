@@ -14,6 +14,6 @@ typedef struct {
 
 void serverInit(ServerConfig* conf, HashTable* ht);
 int serverMain(ServerConfig* conf, HashTable* ht);
-int serverExit(ThreadPool* pool);
+int threadsExit(ThreadPool* pool);
 
 #endif

@@ -79,9 +79,9 @@ Command getCommand(const char* cmd) {
     } else if (strcmp(cmd, "mkdir") == 0) {
         return CMD_MKDIR;
     } else if (strcmp(cmd, "gets") == 0) {
-        return CMD_GETS;
+        return CMD_GETS2;
     } else if (strcmp(cmd, "puts") == 0) {
-        return CMD_PUTS;
+        return CMD_PUTS2;
     } else if (strcmp(cmd, "reg1") == 0) {
         return CMD_REG1;
     } else if (strcmp(cmd, "reg2") == 0) {

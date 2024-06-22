@@ -5,6 +5,7 @@
 
 typedef struct {
     Command cmd;
+    int uid;
     char* token;
     char* host;
     char* port;

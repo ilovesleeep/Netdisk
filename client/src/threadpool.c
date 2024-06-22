@@ -2,6 +2,27 @@
 
 #define BUFSIZE 1024
 
+static int touchTransferServer(int sockfd, Command cmd, Task* task) {
+    char data[BUFSIZE + BUFSIZE] = {0};
+    char old_data[BUFSIZE] = {0};
+
+    char** p = task->args;
+    for (int i = 0; p[i] != NULL; ++i) {
+        strcat(old_data, p[i]);
+        strcat(old_data, " ");
+    }
+    sprintf(data, "%s %s %d", old_data, task->token, task->uid);
+    printf("阶段2请求： %s\n", data);
+    int data_len = strlen(data);
+
+    int res_len = sizeof(cmd) + data_len;
+    sendn(sockfd, &res_len, sizeof(int));
+    sendn(sockfd, &cmd, sizeof(cmd));
+    sendn(sockfd, data, data_len);
+
+    return 0;
+}
+
 void* eventLoop(void* arg) {
     ThreadPool* pool = (ThreadPool*)arg;
     pthread_t tid = pthread_self();
@@ -21,10 +42,18 @@ void* eventLoop(void* arg) {
 
         log_debug("%lu Da! For mother China!", tid);
 
-        if (task->cmd == CMD_PUTS) {
+        if (task->cmd == CMD_GETS1) {
+            printf("进入阶段2\n");
+            touchTransferServer(sockfd, CMD_GETS2, task);
+            sleep(5);
             // putsHandler(sockfd, task);
+            printf("puts 完成\n");
         } else {
+            printf("进入阶段2\n");
+            touchTransferServer(sockfd, CMD_GETS2, task);
+            sleep(5);
             // getsHandler(sockfd, task);
+            printf("gets 完成\n");
         }
         freeTask(task);
 

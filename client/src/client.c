@@ -12,6 +12,7 @@ char g_user[MAX_NAME_LENGTH + 1] = {0};  // +1 for '\0'
 char g_host[MAX_HOST_LENGTH] = "localhost";
 char g_cwd[MAXLINE] = "~";
 
+int g_uid = 0;
 char g_new_host[MAX_HOST_LENGTH] = {0};
 char g_new_port[8] = {0};
 char g_token[MAX_TOKEN_LENGTH] = {0};
@@ -97,7 +98,7 @@ int main(int argc, char* argv[]) {
                     freeStringArray(args);
                     close(sockfd);
                     exit(EXIT_SUCCESS);
-                } else if (cmd == CMD_GETS || cmd == CMD_PUTS) {
+                } else if (cmd == CMD_GETS1 || cmd == CMD_PUTS1) {
                     /*
                     // 更新 token
                     // CMD_INFO_TOKEN:
@@ -114,6 +115,21 @@ int main(int argc, char* argv[]) {
                     // getNewConnectionInfo(sockfd, g_new_host, g_new_port,
                     //                     g_token);
                     */
+
+                    // 给请求加上 token
+                    char new_buf[BUFSIZE + MAX_TOKEN_LENGTH] = {0};
+                    sprintf(new_buf, "%s %s", buf, g_token);
+                    int new_len = strlen(new_buf);
+                    // 先发长度
+                    int total_len = sizeof(cmd) + new_len;
+                    sendn(sockfd, &total_len, sizeof(int));
+                    // 再发内容
+                    sendn(sockfd, &cmd, sizeof(cmd));
+                    sendn(sockfd, new_buf, new_len);
+
+                    freeStringArray(args);
+
+                    continue;
                 }
 
                 // 给调度服务器发请求
@@ -174,7 +190,7 @@ void welcome(int sockfd, char* username) {
         switch (option) {
             case 1:
                 userLogin(sockfd, username, g_cwd);
-                system("clear");
+                // system("clear");
                 printf(
                     "\033[47;30m Sir, this way! What can I do for you? "
                     "\033[0m\n\n");
@@ -212,7 +228,7 @@ int shortResponseHandler(int sockfd, Command cmd) {
 
 char** getInfoList(char* data) { return parseRequest(data); }
 
-int getNewConnectionInfo(int sockfd, char* new_host, char* new_port,
+int getNewConnectionInfo(int sockfd, int* uid, char* new_host, char* new_port,
                          char* token) {
     int data_len = 0;
     recv(sockfd, &data_len, sizeof(int), MSG_WAITALL);
@@ -221,16 +237,18 @@ int getNewConnectionInfo(int sockfd, char* new_host, char* new_port,
     recv(sockfd, conn_data, data_len, MSG_WAITALL);
 
     // printf("get token info:\n host: [%s]\n port: [%s]\n token[%s]\n"m )
-    // printf("获取到认证信息：\n %s \n", conn_data);
+    printf("获取到认证信息：\n %s \n", conn_data);
 
-    //  info_list[0]: host, info_list[1]: port, info_list[2]: token
+    //  info_list[0]: uid, info_list[1]: host
+    //  info_list[2]: port, info_list[3]: token
     char** info_list = getInfoList(conn_data);
+    *uid = atoi(info_list[0]);
     bzero(new_host, MAX_HOST_LENGTH);
     bzero(new_port, 8);
     bzero(token, MAX_TOKEN_LENGTH);
-    strcpy(new_host, info_list[0]);
-    strcpy(new_port, info_list[1]);
-    strcpy(token, info_list[2]);
+    strcpy(new_host, info_list[1]);
+    strcpy(new_port, info_list[2]);
+    strcpy(token, info_list[3]);
 
     freeStringArray(info_list);
 
@@ -258,10 +276,11 @@ Task* getNewConnectionTask(Command cmd, char* res_data) {
 }
 */
 
-Task* makeLongTask(Command cmd, char* res_data, char* new_host, char* new_port,
-                   char* token) {
+Task* makeLongTask(Command cmd, char* res_data, int uid, char* new_host,
+                   char* new_port, char* token) {
     Task* task = (Task*)malloc(sizeof(Task));
     task->cmd = cmd;
+    task->uid = uid;
     task->host = strdup(new_host);
     task->port = strdup(new_port);
     task->token = strdup(token);
@@ -290,13 +309,14 @@ int responseHandler(int sockfd, ThreadPool* pool) {
             switch (cmd) {
                 case CMD_INFO_TOKEN:
                     // 获取新连接信息和token
-                    getNewConnectionInfo(sockfd, g_new_host, g_new_port,
+                    getNewConnectionInfo(sockfd, &g_uid, g_new_host, g_new_port,
                                          g_token);
                     return 0;
-                case CMD_PUTS:
-                case CMD_GETS:
-                    task = makeLongTask(cmd, res_data, g_new_host, g_new_port,
-                                        g_token);
+                case CMD_PUTS1:
+                case CMD_GETS1:
+                    printf("阶段 1 结束\n");
+                    task = makeLongTask(cmd, res_data, g_uid, g_new_host,
+                                        g_new_port, g_token);
                     blockqPush(pool->task_queue, task);
                     return 0;
 
