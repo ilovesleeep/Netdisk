@@ -4,6 +4,7 @@
 #define MAXLINE 1024
 #define MAXUSER 1024
 #define MAX_TOKEN_SIZE 512
+#define TIMEOUT 1000
 
 Task* makeTask(int connfd, int* user_table, DBConnectionPool* dbpool,
                Command cmd, char* request_data) {
@@ -164,6 +165,11 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
     // 子进程
     log_info("%d Kirov process reporting", getpid());
     close(g_exit_pipe[1]);
+
+    // init timerwheel
+    HashMap* hashmap = hashmapCreate();
+    HashedWheelTimer* timer = hwtCreate(WHEEL_SIZE + 1);
+
     chdir("./user");
 
     // epoll
@@ -200,56 +206,108 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
     // 存储用户 id
     int user_table[MAXUSER] = {0};
 
+    // init timeout
+    struct timespec start, end;
+    int timeout = TIMEOUT;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
     // 主循环
     while (1) {
-        int nready = epoll_wait(epfd, ready_events, MAXEVENTS, -1);
-        log_debug("epoll");
+        int nready = epoll_wait(epfd, ready_events, MAXEVENTS, timeout);
 
-        for (int i = 0; i < nready; i++) {
-            if (ready_events[i].data.fd == listenfd) {
-                log_debug("listenfd");
-                // 有新的客户端连接
-                struct sockaddr_storage client_addr;
-                socklen_t addrlen = sizeof(client_addr);
+        if (nready == -1 && errno == EINTR) {
+            error(0, errno, "epoll_wait");
+            continue;
+        } else if (nready == 0) {
+            // 超时
+            hwtClear(timer);
+            timer->curr_idx = (timer->curr_idx + 1) % timer->size;
+            timeout = TIMEOUT;
+        } else {
+            for (int i = 0; i < nready; i++) {
+                if (ready_events[i].data.fd == listenfd) {
+                    log_debug("listenfd new conn");
+                    // 有新的客户端连接
+                    struct sockaddr_storage client_addr;
+                    socklen_t addrlen = sizeof(client_addr);
 
-                int connfd =
-                    accept(listenfd, (struct sockaddr*)&client_addr, &addrlen);
+                    int connfd = accept(
+                        listenfd, (struct sockaddr*)&client_addr, &addrlen);
 
-                // 添加到 epoll
-                epollAdd(epfd, connfd);
-                epollMod(epfd, connfd, EPOLLIN | EPOLLONESHOT);
+                    // 添加到 epoll
+                    epollAdd(epfd, connfd);
+                    epollMod(epfd, connfd, EPOLLIN | EPOLLONESHOT);
 
-            } else if (ready_events[i].data.fd == transferfd) {
-                log_debug("transferfd");
-                // GETS, PUTS建立连接
-                struct sockaddr_storage client_addr;
-                socklen_t addrlen = sizeof(client_addr);
+                    // connfd update
+                    int slot_idx = hashmapSearch(
+                        hashmap, connfd);  // 若存在返回slot，不存在返回-1
+                    slot_idx = hwtUpdate(
+                        timer, connfd,
+                        slot_idx);  // 插入的新的slot，也就是上一个curr_idx的上一个
+                    hashmapInsert(hashmap, connfd, slot_idx);  // 更新hashmap
 
-                int connfd = accept(transferfd, (struct sockaddr*)&client_addr,
-                                    &addrlen);
+                } else if (ready_events[i].data.fd == transferfd) {
+                    log_debug("transferfd new conn");
+                    // GETS, PUTS建立连接
+                    struct sockaddr_storage client_addr;
+                    socklen_t addrlen = sizeof(client_addr);
 
-                // 添加到 epoll
-                epollAdd(epfd, connfd);
+                    int connfd = accept(
+                        transferfd, (struct sockaddr*)&client_addr, &addrlen);
 
-            } else if (ready_events[i].data.fd == g_exit_pipe[0]) {
-                // 父进程传来退出信号
-                free(ready_events);
-                pthread_cancel(monitor_tid);
-                pthread_join(monitor_tid, NULL);
-                destroyDBPool(dbpool);
+                    // 添加到 epoll
+                    epollAdd(epfd, connfd);
 
-                threadsExit(long_pool);
-                threadsExit(short_pool);
+                    // connfd update
+                    int slot_idx = hashmapSearch(
+                        hashmap, connfd);  // 若存在返回slot，不存在返回-1
+                    slot_idx = hwtUpdate(
+                        timer, connfd,
+                        slot_idx);  // 插入的新的slot，也就是上一个curr_idx的上一个
+                    hashmapInsert(hashmap, connfd, slot_idx);  // 更新hashmap
 
-                // 主线程退出
-                log_info("For home country, see you!");
-                pthread_exit(0);
+                } else if (ready_events[i].data.fd == g_exit_pipe[0]) {
+                    // 父进程传来退出信号
+                    free(ready_events);
+                    pthread_cancel(monitor_tid);
+                    pthread_join(monitor_tid, NULL);
+                    destroyDBPool(dbpool);
 
-            } else {
-                // 客户端发过来请求
-                requestHandler(ready_events[i].data.fd, short_pool, long_pool,
-                               user_table, dbpool);
+                    hwtDestroy(timer);
+                    hashmapDestroy(hashmap);
+
+                    threadsExit(long_pool);
+                    threadsExit(short_pool);
+
+                    // 主线程退出
+                    log_info("For home country, see you!");
+                    pthread_exit(0);
+
+                } else {
+                    // 客户端发过来请求
+                    requestHandler(ready_events[i].data.fd, short_pool,
+                                   long_pool, user_table, dbpool);
+
+                    // connfd update
+                    int slot_idx = hashmapSearch(
+                        hashmap, ready_events[i]
+                                     .data.fd);  // 若存在返回slot，不存在返回-1
+                    slot_idx = hwtUpdate(
+                        timer, ready_events[i].data.fd,
+                        slot_idx);  // 插入的新的slot，也就是上一个curr_idx的上一个
+                    hashmapInsert(hashmap, ready_events[i].data.fd,
+                                  slot_idx);  // 更新hashmap
+                }
             }
+
+            // 超时时间的相对计算
+            clock_gettime(CLOCK_MONOTONIC, &end);
+            timeout -= (end.tv_sec - start.tv_sec) * 1000 +
+                       (end.tv_nsec - start.tv_nsec) / 1000000;
+            if (timeout <= 0) {
+                timeout = TIMEOUT;
+            }
+            clock_gettime(CLOCK_MONOTONIC, &start);
         }
     }
 
