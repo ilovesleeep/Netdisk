@@ -4,12 +4,17 @@
 #define BUFSIZE 1024
 #define MAX_NAME_LENGTH 20
 #define MAX_HOST_LENGTH 64
+#define MAX_TOKEN_LENGTH 512
 #define NUM_THREADS 4
 #define MAXEVENTS 1024
 
 char g_user[MAX_NAME_LENGTH + 1] = {0};  // +1 for '\0'
 char g_host[MAX_HOST_LENGTH] = "localhost";
 char g_cwd[MAXLINE] = "~";
+
+char g_new_host[MAX_HOST_LENGTH] = {0};
+char g_new_port[8] = {0};
+char g_token[MAX_TOKEN_LENGTH] = {0};
 
 static void printPrompt(void) {
     printf("\033[32m[%s@%s]:\033[33m%s\033[0m$ ", g_user, g_host, g_cwd);
@@ -45,6 +50,19 @@ int main(int argc, char* argv[]) {
     struct epoll_event* ready_events =
         (struct epoll_event*)calloc(MAXEVENTS, sizeof(struct epoll_event));
 
+    // CMD_INFO_TOKEN:
+    // 给调度服务器发获取token请求
+    char tokenmsg[] = "getToken";
+    int msg_len = strlen(tokenmsg);
+    // 先发长度
+    Command cmd_token = CMD_INFO_TOKEN;
+    int total_len = sizeof(cmd_token) + msg_len;
+    sendn(sockfd, &total_len, sizeof(int));
+    // 再发内容
+    sendn(sockfd, &cmd_token, sizeof(cmd_token));
+    sendn(sockfd, tokenmsg, msg_len);
+    printf("send tokenmsg ok\n");
+
     // 打印提示符
     strncpy(g_host, argv[1], MAX_HOST_LENGTH);
     printPrompt();
@@ -79,6 +97,23 @@ int main(int argc, char* argv[]) {
                     freeStringArray(args);
                     close(sockfd);
                     exit(EXIT_SUCCESS);
+                } else if (cmd == CMD_GETS || cmd == CMD_PUTS) {
+                    /*
+                    // 更新 token
+                    // CMD_INFO_TOKEN:
+                    // 给调度服务器发获取token请求
+                    // 先发长度
+                    Command cmd_token = CMD_INFO_TOKEN;
+                    int total_len = sizeof(cmd_token) + buf_len;
+                    sendn(sockfd, &total_len, sizeof(int));
+                    // 再发内容
+                    sendn(sockfd, &cmd_token, sizeof(cmd_token));
+                    sendn(sockfd, buf, buf_len);
+
+                    // 接收
+                    // getNewConnectionInfo(sockfd, g_new_host, g_new_port,
+                    //                     g_token);
+                    */
                 }
 
                 // 给调度服务器发请求
@@ -175,6 +210,66 @@ int shortResponseHandler(int sockfd, Command cmd) {
     }
 }
 
+char** getInfoList(char* data) { return parseRequest(data); }
+
+int getNewConnectionInfo(int sockfd, char* new_host, char* new_port,
+                         char* token) {
+    int data_len = 0;
+    recv(sockfd, &data_len, sizeof(int), MSG_WAITALL);
+
+    char conn_data[1024] = {0};
+    recv(sockfd, conn_data, data_len, MSG_WAITALL);
+
+    // printf("get token info:\n host: [%s]\n port: [%s]\n token[%s]\n"m )
+    // printf("获取到认证信息：\n %s \n", conn_data);
+
+    //  info_list[0]: host, info_list[1]: port, info_list[2]: token
+    char** info_list = getInfoList(conn_data);
+    bzero(new_host, MAX_HOST_LENGTH);
+    bzero(new_port, 8);
+    bzero(token, MAX_TOKEN_LENGTH);
+    strcpy(new_host, info_list[0]);
+    strcpy(new_port, info_list[1]);
+    strcpy(token, info_list[2]);
+
+    freeStringArray(info_list);
+
+    return 0;
+}
+/*
+char** getNewTaskInfo(char* res_data) { return parseRequest(res_data); }
+
+Task* getNewConnectionTask(Command cmd, char* res_data) {
+    // 响应内容中包含了：资源服务器 host，端口 port 令牌 token 等其他信息
+    // 解析响应内容，获取新的连接需要的信息，创建新连接(长命令)任务
+
+    // info[0] host, info[1]: port, info[2]: token
+    char** info = getNewTaskInfo(res_data);
+
+    Task* task = (Task*)malloc(sizeof(Task));
+    task->cmd = cmd;
+    task->host = strdup(info[0]);
+    task->port = strdup(info[1]);
+    task->token = strdup(info[2]);
+
+    freeStringArray(info);
+
+    return task;
+}
+*/
+
+Task* makeLongTask(Command cmd, char* res_data, char* new_host, char* new_port,
+                   char* token) {
+    Task* task = (Task*)malloc(sizeof(Task));
+    task->cmd = cmd;
+    task->host = strdup(new_host);
+    task->port = strdup(new_port);
+    task->token = strdup(token);
+    task->args = parseRequest(res_data);
+
+    return task;
+}
+
 int responseHandler(int sockfd, ThreadPool* pool) {
     // 接收响应长度
     int res_len = -1;
@@ -187,15 +282,21 @@ int responseHandler(int sockfd, ThreadPool* pool) {
         int data_len = res_len - sizeof(cmd);
         ret = recv(sockfd, &cmd, sizeof(cmd), MSG_WAITALL);
         ret = recv(sockfd, res_data, data_len, MSG_WAITALL);
-        log_debug("recv res_data: '%s'", res_data);
+        // log_debug("recv res_data: '%s'", res_data);
 
         if (ret > 0) {  // 接收到了有效响应
             // 分离长短命令, 主线程处理短命令响应
             Task* task = NULL;  // 避免警告，在标签外声明 task
             switch (cmd) {
+                case CMD_INFO_TOKEN:
+                    // 获取新连接信息和token
+                    getNewConnectionInfo(sockfd, g_new_host, g_new_port,
+                                         g_token);
+                    return 0;
                 case CMD_PUTS:
                 case CMD_GETS:
-                    task = getNewConnectionTask(cmd, res_data);
+                    task = makeLongTask(cmd, res_data, g_new_host, g_new_port,
+                                        g_token);
                     blockqPush(pool->task_queue, task);
                     return 0;
 

@@ -10,16 +10,13 @@ typedef struct {
     char* port;
 
     // gets, puts 需要的参数
+    char** args;
 
     // TODO: 方案1：分片+合并
     // char* file;        // 文件名
     // int splice_start;  // 文件切片起始位置
     // int splice_size;   // 文件切片大小
 } Task;
-
-char** getNewConnectionInfo(char* res_data);
-
-Task* getNewConnectionTask(Command cmd, char* res_data);
 
 void freeTask(Task* task);
 

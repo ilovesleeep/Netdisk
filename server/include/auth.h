@@ -1,11 +1,17 @@
 #ifndef __NB_AUTH_C
 #define __NB_AUTH_C
 
+#include <l8w8jwt/decode.h>
+#include <l8w8jwt/encode.h>
+
 #include "head.h"
 #include "log.h"
 #include "mysqloperate.h"
 #include "task.h"
 #include "transfer.h"
+
+int makeToken(char* token, int uid);
+int checkToken(char* token, int uid);
 
 char* generateSalt(void);
 
