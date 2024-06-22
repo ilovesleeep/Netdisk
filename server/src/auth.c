@@ -503,7 +503,7 @@ void loginCheck2(Task* task) {
         char cwd[1024] = {0};
         MYSQL* pconn = getDBConnection(task->dbpool);
         int pwdid = getPwdId(pconn, uid);
-        getPwd(pconn, uid, cwd, sizeof(cwd));
+        getPwd(pconn, pwdid, cwd, sizeof(cwd));
         releaseDBConnection(task->dbpool, pconn);
         // 发送给客户端
         int cwd_len = strlen(cwd);
