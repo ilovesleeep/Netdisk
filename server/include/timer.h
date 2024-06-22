@@ -4,7 +4,7 @@
 #include "hashset.h"
 
 
-#define WHEEL_SIZE 30
+#define WHEEL_SIZE 3600
 
 typedef struct {
     HashSet** slots;

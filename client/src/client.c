@@ -122,10 +122,10 @@ int main(int argc, char* argv[]) {
                     int new_len = strlen(new_buf);
                     // 先发长度
                     int total_len = sizeof(cmd) + new_len;
-                    sendn(sockfd, &total_len, sizeof(int));
+                    int ret = sendn(sockfd, &total_len, sizeof(int));
                     // 再发内容
-                    sendn(sockfd, &cmd, sizeof(cmd));
-                    sendn(sockfd, new_buf, new_len);
+                    ret = sendn(sockfd, &cmd, sizeof(cmd));
+                    ret = sendn(sockfd, new_buf, new_len);
 
                     freeStringArray(args);
 

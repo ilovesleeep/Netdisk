@@ -6,7 +6,8 @@
 #define BUFSIZE 4096
 #define MAXLINE 1024
 #define BIGFILE_SIZE (100 * 1024 * 1024)
-#define MMAPSIZE (1024 * 1024)
+#define MMAPSIZE (1024 * 1024 * 10)
+#define HASH_SIZE 32
 
 typedef struct {
     int length;
@@ -51,7 +52,6 @@ int sendFile(int sockfd, int fd) {
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
     // 计算自己的哈希值(不可能有文件空洞)
-    unsigned char md5sum_client[16];
     MD5_CTX ctx;
     MD5_Init(&ctx);
     for (off_t curr = 0; curr < statbuf.st_size; curr += MMAPSIZE) {
@@ -70,11 +70,17 @@ int sendFile(int sockfd, int fd) {
         }
     }
     // 生成MD5值
-    unsigned char md5sum[16];
+    unsigned char md5sum[16] = {0};
     MD5_Final(md5sum, &ctx);
 
+    //转换为看得懂的字符串类型
+    char md5_hex[HASH_SIZE + 1];
+    for (int i = 0; i < 16; i++) {
+        sprintf(md5_hex + (i * 2), "%02x", md5sum[i]);
+    }
+
     // 发送哈希值
-    send(sockfd, md5sum, sizeof(md5sum), MSG_NOSIGNAL);
+    send(sockfd, md5_hex, HASH_SIZE, MSG_NOSIGNAL);
 #pragma GCC diagnostic pop
 
     // 服务端是否允许发送
@@ -139,8 +145,8 @@ int recvFile(int sockfd) {
     recvn(sockfd, &block.length, sizeof(int));
     recvn(sockfd, block.data, block.length);
     // 先接收哈希值和文件大小
-    char f_hash[17] = {0};
-    recvn(sockfd, f_hash, 16);
+    char f_hash[HASH_SIZE + 1] = {0};
+    recvn(sockfd, f_hash, HASH_SIZE);
     off_t f_size = 0;
     recvn(sockfd, &f_size, sizeof(off_t));
 
@@ -222,9 +228,15 @@ int recvFile(int sockfd) {
         // 生成哈希值
         unsigned char md5sum[16];
         MD5_Final(md5sum, &ctx);
+
+        char md5_hex[HASH_SIZE + 1];
+        for (int i = 0; i < 16; i++) {
+            sprintf(md5_hex + (i * 2), "%02x", md5sum[i]);
+        }
+
         // 发送文件实际大小及哈希值
         // 若哈希值相等
-        if (memcmp(md5sum, f_hash, 16) == 0) {
+        if (memcmp(md5_hex, f_hash, HASH_SIZE) == 0) {
             int send_stat = 0;
             sendn(sockfd, &send_stat, sizeof(int));
             close(fd);
@@ -235,7 +247,7 @@ int recvFile(int sockfd) {
             int send_stat = 1;
             sendn(sockfd, &send_stat, sizeof(int));
             sendn(sockfd, &recv_bytes, sizeof(recv_bytes));
-            sendn(sockfd, md5sum, sizeof(md5sum));
+            sendn(sockfd, md5_hex, HASH_SIZE);
         }
     }
 #pragma GCC diagnostic pop

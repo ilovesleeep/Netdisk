@@ -4,13 +4,40 @@
 #define MAX_TOKEN_SIZE 512
 
 static int touchClient(Task* task, Command cmd) {
-    char data[2] = "1";
-    int res_len = sizeof(Command) + 1;
+    char data[MAXLINE * 2] = {0};
+    char old_data[MAXLINE] = {0};
+
+    char** p = task->args;
+    for (int i = 0; p[i] != NULL; ++i) {
+        strcat(old_data, p[i]);
+        strcat(old_data, " ");
+    }
+    sprintf(data, "%s %s %d", old_data, task->token, task->uid);
+    int data_len = strlen(data);
+
+    int res_len = sizeof(Command) + data_len;
     sendn(task->fd, &res_len, sizeof(int));
     sendn(task->fd, &cmd, sizeof(Command));
-    sendn(task->fd, data, 1);
+    sendn(task->fd, data, data_len);
 
     return 0;
+}
+
+void freeUnusedParameter(char** parameter){
+    int i = 0, j = 0;
+    // 提取出 uid
+    while (parameter[i + 1] != NULL) {
+        ++i;
+    }  // p[i+1] == NULL, p[i]是最后一个元素
+    free(parameter[i]);
+    parameter[i] = NULL;
+
+    // 提取出 token
+    while (parameter[j + 1] != NULL) {
+        ++j;
+    }  // p[j+1] == NULL, p[j]是最后一个元素
+    free(parameter[j]);
+    parameter[j] = NULL;
 }
 
 static int tellClient(int connfd, int* user_table) {
@@ -69,10 +96,16 @@ void* eventLoop(void* arg) {
             case CMD_GETS2:
                 if (checkToken(task->token, task->uid) == 0) {
                     printf("阶段2 成功\n");
-                    taskHandler(task);
+                    freeUnusedParameter(task->args);
+                    retval = taskHandler(task);
                     char* tmp = task->cmd == CMD_GETS2 ? "gets" : "puts";
-                    sleep(5);
                     printf("执行 %s 完成\n", tmp);
+                    if (retval != 1) {
+                        epollMod(pool->epfd, connfd, EPOLLIN | EPOLLONESHOT);
+                    } else {
+                        epollDel(pool->epfd, connfd);
+                        close(connfd);
+                    }
                     break;
                 } else {
                     printf("阶段2 失败\n");
@@ -87,12 +120,12 @@ void* eventLoop(void* arg) {
 
         log_debug("%lu Ura! Waiting orders.\n", tid);
 
-        if (retval != 1) {
-            epollMod(pool->epfd, connfd, EPOLLIN | EPOLLONESHOT);
-        } else {
-            epollDel(pool->epfd, connfd);
-            close(connfd);
-        }
+        // if (retval != 1) {
+        //     epollMod(pool->epfd, connfd, EPOLLIN | EPOLLONESHOT);
+        // } else {
+        //     epollDel(pool->epfd, connfd);
+        //     close(connfd);
+        // }
         // epollAdd(pool->epfd, connfd);
     }
 }
