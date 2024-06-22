@@ -227,10 +227,10 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
                     // 添加到 epoll
                     epollAdd(epfd, connfd);
 
-                    // // connfd update
-                    // int slot_idx = hashmapSearch(hashmap, connfd); // 若存在返回slot，不存在返回-1
-                    // slot_idx = hwtUpdate(timer, connfd, slot_idx); // 插入的新的slot，也就是上一个curr_idx的上一个
-                    // hashmapInsert(hashmap, connfd, slot_idx); //更新hashmap
+                    // connfd update
+                    int slot_idx = hashmapSearch(hashmap, connfd); // 若存在返回slot，不存在返回-1
+                    slot_idx = hwtUpdate(timer, connfd, slot_idx); // 插入的新的slot，也就是上一个curr_idx的上一个
+                    hashmapInsert(hashmap, connfd, slot_idx); //更新hashmap
 
 
 
