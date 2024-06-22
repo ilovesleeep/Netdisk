@@ -1,7 +1,5 @@
 #include "../include/server.h"
 
-#include <bits/time.h>
-#include <linux/time.h>
 #define MAXEVENTS 1024
 #define MAXLINE 1024
 #define MAXUSER 1024
@@ -185,9 +183,10 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
     clock_gettime(CLOCK_MONOTONIC, &start);
 
     // 主循环
+    log_debug("epoll");
     while (1) {
         int nready = epoll_wait(epfd, ready_events, MAXEVENTS, timeout);
-        log_debug("epoll");
+        
         if (nready == -1 && errno == EINTR) {
             error(0, errno, "epoll_wait");
             continue;
@@ -228,10 +227,10 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
                     // 添加到 epoll
                     epollAdd(epfd, connfd);
 
-                    // connfd update
-                    int slot_idx = hashmapSearch(hashmap, connfd); // 若存在返回slot，不存在返回-1
-                    slot_idx = hwtUpdate(timer, connfd, slot_idx); // 插入的新的slot，也就是上一个curr_idx的上一个
-                    hashmapInsert(hashmap, connfd, slot_idx); //更新hashmap
+                    // // connfd update
+                    // int slot_idx = hashmapSearch(hashmap, connfd); // 若存在返回slot，不存在返回-1
+                    // slot_idx = hwtUpdate(timer, connfd, slot_idx); // 插入的新的slot，也就是上一个curr_idx的上一个
+                    // hashmapInsert(hashmap, connfd, slot_idx); //更新hashmap
 
 
 
@@ -256,15 +255,16 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
                     
                 }
             }
+            // 超时时间的相对计算
+            clock_gettime(CLOCK_MONOTONIC, &end);
+            timeout -= (end.tv_sec - start.tv_sec) * 1000 + (end.tv_nsec - start.tv_nsec) / 1000000;
+            if (timeout <= 0) {
+                timeout = TIMEOUT;
+            }
+            clock_gettime(CLOCK_MONOTONIC, &start);
         }
 
-        // 超时时间的相对计算
-        clock_gettime(CLOCK_MONOTONIC, &end);
-        timeout -= (end.tv_sec - start.tv_sec) * 1000 + (end.tv_nsec - start.tv_nsec) / 1000000;
-        if (timeout <= 0) {
-            timeout = TIMEOUT;
-        }
-        clock_gettime(CLOCK_MONOTONIC, &start);
+        
     }
 
     return 0;
