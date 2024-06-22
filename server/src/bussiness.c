@@ -139,8 +139,8 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
     if (file_id < 0 && type == 'f') {
         // 修改目录项
         file_id = -file_id;
-        updateRecord(mysql, file_id, NULL, NULL, (const char*)recv_hash, NULL,
-                     NULL, NULL, NULL);
+        updateRecord(mysql, file_id, NULL, NULL,
+                     (const unsigned char*)recv_hash, NULL, NULL, NULL, NULL);
         int send_stat = 1;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
     } else {
@@ -159,8 +159,9 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
         int send_stat = 0;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
 
-        updateRecord(mysql, file_id, NULL, NULL, (const char*)recv_hash, NULL,
-                     &f_size, &c_size, "1");
+        updateRecord(mysql, file_id, NULL, NULL,
+                     (const unsigned char*)recv_hash, NULL, &f_size, &c_size,
+                     "1");
         return 0;
     } else {
         // 文件存在但不完整或文件不存在
@@ -344,53 +345,6 @@ int cdCmd(Task* task) {
     return 0;
 }
 
-#if 0
-void lsCmd1(Task* task) {
-    // 告知客户端，接收当前命令的响应
-    touchClient(task);
-
-    // bufsize = 4096
-    char result[BUFSIZE] = {0};
-
-    // 校验参数,发送校验结果，若为错误则继续发送错误信息
-    if (task->args[1] != NULL) {
-        // int sendstat = 1;
-        // send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
-
-        char* error_info = "parameter number error";
-        int info_len = strlen(error_info);
-        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-        send(task->fd, error_info, info_len, MSG_NOSIGNAL);
-
-        log_error("lsCmd: parameter number error");
-    } else {
-        // int sendstat = 0;
-        // send(task->fd, &sendstat, sizeof(int), MSG_NOSIGNAL);
-        // 获取当前路径
-        MYSQL* mysql = getDBConnection(task->dbpool);
-        // int pwdid = getPwdId(mysql, task->uid);
-        int pwdid = getPwdId(mysql, task->uid);
-        char** family = findchild(mysql, pwdid);
-        char** p = family;
-        releaseDBConnection(task->dbpool, mysql);
-
-        while (*p != NULL) {
-            strncat(result, *p, sizeof(result) - strlen(*p) - 1);
-            strncat(result, "\t", sizeof(result) - strlen("\t") - 1);
-            p++;
-        }
-        freeStringArray(family);
-
-        // 发送（大火车）
-        int info_len = strlen(result);
-        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-        send(task->fd, result, info_len, MSG_NOSIGNAL);
-    }
-
-    return;
-}
-#endif
-
 int lsCmd(Task* task) {
     // 告知客户端，接收当前命令的响应
     touchClient(task);
@@ -512,117 +466,11 @@ int rmCmdHelper(MYSQL* mysql, int uid, int pwdid, char type) {
     return 0;
 }
 
-#if 0
 void rmCmd(Task* task) {
     // 告知客户端，接受当前命令的响应
     touchClient(task);
     char** parameter = task->args;
-    // TODO:
-    // 删除文件及目录。
-    // 如果删除的是文件，则直接将它的exist设为“0”。
-    // 如果删除的是目录，则需要查看它是否存在子目录。需要遍历父目录id，找到和本目录id相等的行。
-    // 并且递归查询下去，直到找到一个目录项不是当前目录id为止，并将它们的exist类型都设置为“0”。
-
-    // 参数校验,只接受一个参数。 "usage: rm file/dict."
-    if (task->args[1] == NULL) {
-        int send_stat = 1;
-        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-        char error_info[] = "rm: 缺少操作对象";
-        int info_len = strlen(error_info);
-        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-        send(task->fd, error_info, info_len, MSG_NOSIGNAL);
-
-        return;
-    } else if (task->args[2] != NULL) {
-        int send_stat = 1;
-        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-        char error_info[] = "rm: 参数太多";
-        int info_len = strlen(error_info);
-        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-        send(task->fd, error_info, info_len, MSG_NOSIGNAL);
-
-        return;
-    } else {
-        int send_stat = 0;
-        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-    }
-
-    MYSQL* mysql = getDBConnection(task->dbpool);
-    int pwdid = getPwdId(mysql, task->uid);
-    char pwd[1024] = {0};
-    getPwd(mysql, pwdid, pwd, 1024);
-    char type = getTypeById(mysql, pwdid);
-
-<<<<<<< HEAD
-    int res = rmCmdHelper(mysql, task->uid, pwdid, pwd, type);
-=======
-    for (char* p = parameter[1]; *p != '\0'; p++) {
-        for (char* start = p; *p != '\0' && *p != '/'; p++) {
-            if (*(p + 1) == '/') {
-                char type = '\0';
-                char name[256] = {0};
-                strncpy(name, start, p - start + 1);
-                pwdid = goToRelativeDir(mysql, pwdid, name, &type);
-                if (pwdid <= 0 || type == 'f') {
-                    int send_stat = 1;
-                    send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-                    char send_info[] = "path error";
-                    int info_len = strlen(send_info);
-                    send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-                    send(task->fd, send_info, info_len, MSG_NOSIGNAL);
-                    releaseDBConnection(task->dbpool, mysql);
-                    return 0;
-                }
-            }
-            if (*(p + 1) == '\0') {
-                char type = '\0';
-                char name[256] = {0};
-                strncpy(name, start, p - start + 1);
-                pwdid = goToRelativeDir(mysql, pwdid, name, &type);
-                if (pwdid <= 0) {
-                    int send_stat = 1;
-                    send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-                    char send_info[] = "path error";
-                    int info_len = strlen(send_info);
-                    send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-                    send(task->fd, send_info, info_len, MSG_NOSIGNAL);
-                    releaseDBConnection(task->dbpool, mysql);
-                    return 0;
-                }
-            }
-        }
-    }
-    type = getTypeById(mysql, pwdid);
-    int res = rmCmdHelper(mysql, task->uid, pwdid, type);
->>>>>>> refs/remotes/origin/dev
-    if (res != 0) {
-        // 错误，未能成功删除
-        int send_stat = 1;
-        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-        char error_info[] = "rm failed";
-        int info_len = strlen(error_info);
-        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
-        send(task->fd, error_info, info_len, MSG_NOSIGNAL);
-        log_error("rm %s failed.", pwd);
-        releaseDBConnection(task->dbpool, mysql);
-        error(1, 0, "[ERROR] rm failed\n");
-    } else {
-        // 成功删除
-        int send_stat = 0;
-        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-    }
-
-    releaseDBConnection(task->dbpool, mysql);
-    return;
-}
-#endif
-
-void rmCmd(Task* task) {
-    // 告知客户端，接受当前命令的响应
-    touchClient(task);
-    char** parameter = task->args;
-    // TODO:
+    // NOTE:
     // 删除文件及目录。
     // 如果删除的是文件，则直接将它的exist设为“0”。
     // 如果删除的是目录，则需要查看它是否存在子目录。需要遍历父目录id，找到和本目录id相等的行。

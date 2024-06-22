@@ -6,6 +6,17 @@
 #define MAX_TOKEN_SIZE 512
 #define TIMEOUT 1000
 
+void serverInit(ServerConfig* conf, HashTable* ht) {
+    char* port = (char*)find(ht, "port");
+    if (port != NULL) {
+        strcpy(conf->port, port);
+    }
+    const char* num_str = (const char*)find(ht, "num_threads");
+    if (num_str != NULL) {
+        conf->num_threads = atoi(num_str);
+    }
+}
+
 Task* makeTask(int connfd, int* user_table, DBConnectionPool* dbpool,
                Command cmd, char* request_data) {
     Task* task = (Task*)malloc(sizeof(Task));
@@ -51,6 +62,7 @@ Task* makeTask(int connfd, int* user_table, DBConnectionPool* dbpool,
             break;
         default:
             task->token = NULL;
+            break;
     }
 
     return task;
@@ -62,14 +74,14 @@ static int requestHandler(int connfd, ThreadPool* short_pool,
     // 接收请求长度
     int request_len = -1;
     int ret = recv(connfd, &request_len, sizeof(int), MSG_WAITALL);
-    log_debug("recv len %d", request_len);
+    log_debug("recv total len %d", request_len);
 
     if (request_len > 0) {  // 接收到了有效长度
         Command cmd = -1;
         char request_data[MAXLINE] = {0};
         int data_len = request_len - sizeof(cmd);
         ret = recv(connfd, &cmd, sizeof(cmd), MSG_WAITALL);
-        log_debug("recv len %d", data_len);
+        log_debug("recv data len %d", data_len);
         ret = recv(connfd, request_data, data_len, MSG_WAITALL);
         log_debug("recv data %s", request_data);
 
@@ -103,17 +115,6 @@ static int requestHandler(int connfd, ThreadPool* short_pool,
     }
 
     return 0;
-}
-
-void serverInit(ServerConfig* conf, HashTable* ht) {
-    char* port = (char*)find(ht, "port");
-    if (port != NULL) {
-        strcpy(conf->port, port);
-    }
-    const char* num_str = (const char*)find(ht, "num_threads");
-    if (num_str != NULL) {
-        conf->num_threads = atoi(num_str);
-    }
 }
 
 int g_exit_pipe[2];

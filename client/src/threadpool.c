@@ -11,6 +11,7 @@ static int touchTransferServer(int sockfd, Command cmd, Task* task) {
         strcat(old_data, p[i]);
         strcat(old_data, " ");
     }
+    printf("旧的请求： %s\n", data);
     sprintf(data, "%s %s %d", old_data, task->token, task->uid);
     printf("阶段2请求： %s\n", data);
     int data_len = strlen(data);

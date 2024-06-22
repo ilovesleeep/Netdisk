@@ -138,7 +138,7 @@ char* generateSalt(void) {
 
 void getSaltByCryptPasswd(char* salt, char* cryptpasswd) {
     int i, j;
-    // 取出salt,i 记录密码字符下标，j记录$出现次数
+    // 取出 salt, i 记录密码字符下标，j记录$出现次数
     for (i = 0, j = 0; cryptpasswd[i] && j != 3; ++i) {
         if (cryptpasswd[i] == '$') ++j;
     }
@@ -187,7 +187,7 @@ char* getCryptpasswdByUID(MYSQL* pconn, int uid) {
         }
 
         strncpy(cryptpasswd, row[0], lengths[0]);
-        cryptpasswd[lengths[0]] = '\0';  // 添加 null 终止符
+        cryptpasswd[lengths[0]] = '\0';  //  NULL for safe
     }
 
     mysql_free_result(res);
