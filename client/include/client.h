@@ -20,7 +20,7 @@ int sessionHandler(int sockfd, char* host, char* user);
 
 int responseHandler(int sockfd, ThreadPool* pool);
 
-int getNewConnectionInfo(int sockfd, char* new_host, char* new_port,
+int getNewConnectionInfo(int sockfd, int* uid, char* new_host, char* new_port,
                          char* token);
 Task* getNewConnectionTask(Command cmd, char* res_data);
 

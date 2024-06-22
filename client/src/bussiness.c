@@ -296,7 +296,9 @@ int cdCmd(int sockfd, char* cwd) {
         int pwd_len = 0;
         bzero(cwd, MAXLINE);
         recv(sockfd, &pwd_len, sizeof(int), MSG_WAITALL);
+        printf("cwd_len: %d\n", pwd_len);
         recv(sockfd, cwd, pwd_len, MSG_WAITALL);
+        printf("cwd: %s\n", cwd);
     }
     return 0;
 }

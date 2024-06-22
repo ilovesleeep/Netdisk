@@ -23,8 +23,8 @@ int makeToken(char* token, int uid) {
     /* Set to expire after 10 minutes (600 seconds). */
     // unix 时间戳
     params.iat = l8w8jwt_time(NULL);  // 什么时候签发的
-    // 设置为 10 分钟过期
-    params.exp = l8w8jwt_time(NULL) + 600;  // 什么时候过期
+    // 设置为 30 分钟过期
+    params.exp = l8w8jwt_time(NULL) + 1800;  // 什么时候过期
 
     params.secret_key = (unsigned char*)KEY;
     params.secret_key_length = strlen((const char*)params.secret_key);
@@ -34,7 +34,7 @@ int makeToken(char* token, int uid) {
 
     int r = l8w8jwt_encode(&params);
 
-    printf("\n l8w8jwt example HS512 token: %s \n",
+    printf("\n l8w8jwt HS512 token: %s \n",
            r == L8W8JWT_SUCCESS ? jwt : " (encoding failure) ");
 
     bzero(token, MAX_TOKEN_SIZE);
@@ -48,6 +48,9 @@ int makeToken(char* token, int uid) {
 
 // 成功返回 0， 失败返回 1
 int checkToken(char* token, int uid) {
+    printf("check 开始：\nuid: %d\n", uid);
+    printf("token: %s\ncheck 结束\n", token);
+
     char* jwt = token;
 
     struct l8w8jwt_decoding_params params;
@@ -70,7 +73,7 @@ int checkToken(char* token, int uid) {
     params.validate_iss = "NewBee Netdisk";
     params.validate_sub = user;
 
-    params.validate_exp = 0;
+    params.validate_exp = 1;
     params.exp_tolerance_seconds = 60;
 
     params.validate_iat = 1;
@@ -82,12 +85,11 @@ int checkToken(char* token, int uid) {
 
     if (decode_result == L8W8JWT_SUCCESS &&
         validation_result == L8W8JWT_VALID) {
-        printf("\n Example HS512 token validation successful! \n");
+        printf("\n NewBee HS512 token validation successful! \n");
         return 0;
     } else {
-        // printf("\n Example HS512 token validation failed! \n");
-        // return 1;
-        return 0;
+        printf("\n NewBee HS512 token validation failed! \n");
+        return 1;
     }
 
     /*
@@ -503,8 +505,9 @@ void loginCheck2(Task* task) {
         char cwd[1024] = {0};
         MYSQL* pconn = getDBConnection(task->dbpool);
         int pwdid = getPwdId(pconn, uid);
-        getPwd(pconn, uid, cwd, sizeof(cwd));
+        getPwd(pconn, pwdid, cwd, sizeof(cwd));
         releaseDBConnection(task->dbpool, pconn);
+        printf("用户上次目录：%s\n", cwd);
         // 发送给客户端
         int cwd_len = strlen(cwd);
         sendn(task->fd, &cwd_len, sizeof(int));

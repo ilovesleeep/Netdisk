@@ -5,8 +5,8 @@
 #define MAXUSER 1024
 #define MAX_TOKEN_SIZE 512
 
-Task* makeTask(int connfd, ThreadPool* pool, int* user_table,
-               DBConnectionPool* dbpool, Command cmd, char* request_data) {
+Task* makeTask(int connfd, int* user_table, DBConnectionPool* dbpool,
+               Command cmd, char* request_data) {
     Task* task = (Task*)malloc(sizeof(Task));
     task->fd = connfd;
     task->uid = user_table[connfd];
@@ -14,16 +14,49 @@ Task* makeTask(int connfd, ThreadPool* pool, int* user_table,
     task->cmd = cmd;
     task->args = getArgs(request_data);
     task->dbpool = dbpool;
-    if (cmd == CMD_PUTS || cmd == CMD_GETS) {
-        task->token = task->args[0];
-    } else {
-        task->token = NULL;
+
+    char** p = task->args;
+    int i = 0, j = 0;
+    switch (cmd) {
+        case CMD_PUTS1:
+        case CMD_GETS1:
+            // 提取出 token
+            while (p[i + 1] != NULL) {
+                ++i;
+            }  // p[i+1] == NULL, p[i]是最后一个元素
+            task->token = strdup(p[i]);
+            free(p[i]);
+            p[i] = NULL;
+
+            break;
+        case CMD_PUTS2:
+        case CMD_GETS2:
+            // 提取出 uid
+            while (p[i + 1] != NULL) {
+                ++i;
+            }  // p[i+1] == NULL, p[i]是最后一个元素
+            task->uid = atoi(p[i]);
+            free(p[i]);
+            p[i] = NULL;
+
+            // 提取出 token
+            while (p[j + 1] != NULL) {
+                ++j;
+            }  // p[j+1] == NULL, p[j]是最后一个元素
+            task->token = strdup(p[j]);
+            free(p[j]);
+            p[j] = NULL;
+
+            break;
+        default:
+            task->token = NULL;
     }
 
     return task;
 }
 
-static int requestHandler(int connfd, ThreadPool* pool, int* user_table,
+static int requestHandler(int connfd, ThreadPool* short_pool,
+                          ThreadPool* long_pool, int* user_table,
                           DBConnectionPool* dbpool) {
     // 接收请求长度
     int request_len = -1;
@@ -39,28 +72,22 @@ static int requestHandler(int connfd, ThreadPool* pool, int* user_table,
         ret = recv(connfd, request_data, data_len, MSG_WAITALL);
         log_debug("recv data %s", request_data);
 
-        if (ret > 0) {                // 接收到了有效请求
-            Task* task = NULL;        // 避免警告，在标签外声明 task
-            Task* token_task = NULL;  // 避免警告，在标签外声明 task
+        if (ret > 0) {          // 接收到了有效请求
+            Task* task = NULL;  // 避免警告，在标签外声明 task
             switch (cmd) {
-                case CMD_INFO_TOKEN:
-                    // 发送token
-                    token_task = makeTask(connfd, pool, user_table, dbpool,
-                                          CMD_INFO_TOKEN, request_data);
-                    blockqPush(pool->task_queue, token_task);
-                    return 0;
-                case CMD_PUTS:
-                case CMD_GETS:
-                    // 创建长连接任务
-                    task = makeTask(connfd, pool, user_table, dbpool, cmd,
-                                    request_data);
-                    blockqPush(pool->task_queue, task);
+                case CMD_PUTS2:
+                case CMD_GETS2:
+                    task =
+                        makeTask(connfd, user_table, dbpool, cmd, request_data);
+                    // 放入长任务线程池
+                    blockqPush(long_pool->task_queue, task);
                     return 0;
 
                 default:
-                    task = makeTask(connfd, pool, user_table, dbpool, cmd,
-                                    request_data);
-                    blockqPush(pool->task_queue, task);
+                    task =
+                        makeTask(connfd, user_table, dbpool, cmd, request_data);
+                    // 放入短任务线程池
+                    blockqPush(short_pool->task_queue, task);
                     return 0;
             }
         }
@@ -94,13 +121,13 @@ static void exitHandler(int signo) {
     write(g_exit_pipe[1], "1", 1);
 }
 
-int serverExit(ThreadPool* pool) {
+int threadsExit(ThreadPool* pool) {
     // 父进程传来信号
     log_info("All the comrades, exit!");
 
     // 通知各个子线程退出
     for (int j = 0; j < pool->num_threads; j++) {
-        Task exit_task = {-1, 0, NULL, 0, NULL, NULL};
+        Task exit_task = {-1, 0, NULL, 0, NULL, NULL, NULL};
         blockqPush(pool->task_queue, &exit_task);
     }
     // 等待各个子线程退出
@@ -109,12 +136,12 @@ int serverExit(ThreadPool* pool) {
     }
 
     // 主线程退出
-    log_info("For home country, see you!");
-    pthread_exit(0);
+    // log_info("For home country, see you!");
+    // pthread_exit(0);
+    return 0;
 }
 
 int serverMain(ServerConfig* conf, HashTable* ht) {
-#if 0
     pipe(g_exit_pipe);
     pid_t pid = fork();
     switch (pid) {
@@ -137,16 +164,19 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
     // 子进程
     log_info("%d Kirov process reporting", getpid());
     close(g_exit_pipe[1]);
-#endif
     chdir("./user");
+
     // epoll
     int epfd = epoll_create(1);
 
     // g_exit_pipe 读端加入 epoll
     epollAdd(epfd, g_exit_pipe[0]);
 
-    // 创建线程池
-    ThreadPool* pool = createThreadPool(conf->num_threads, epfd);
+    // 创建短命令线程池
+    ThreadPool* short_pool = createThreadPool(conf->num_threads, epfd);
+
+    // 创建长命令线程池
+    ThreadPool* long_pool = createThreadPool(conf->num_threads, epfd);
 
     // 初始化数据库连接池
     DBConnectionPool* dbpool = initDBPool(ht);
@@ -207,12 +237,18 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
                 pthread_cancel(monitor_tid);
                 pthread_join(monitor_tid, NULL);
                 destroyDBPool(dbpool);
-                serverExit(pool);
+
+                threadsExit(long_pool);
+                threadsExit(short_pool);
+
+                // 主线程退出
+                log_info("For home country, see you!");
+                pthread_exit(0);
 
             } else {
                 // 客户端发过来请求
-                requestHandler(ready_events[i].data.fd, pool, user_table,
-                               dbpool);
+                requestHandler(ready_events[i].data.fd, short_pool, long_pool,
+                               user_table, dbpool);
             }
         }
     }

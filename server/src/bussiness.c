@@ -1006,10 +1006,10 @@ int taskHandler(Task* task) {
         case CMD_MKDIR:
             mkdirCmd(task);
             break;
-        case CMD_GETS:
+        case CMD_GETS2:
             retval = getsCmd(task);
             break;
-        case CMD_PUTS:
+        case CMD_PUTS2:
             retval = putsCmd(task);
             break;
         case CMD_LOGIN1:
