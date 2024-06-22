@@ -18,8 +18,8 @@ int recvFile(int sockfd, MYSQL* mysql, int uid);
 
 int cdCmd(Task* task);
 void lsCmd(Task* task);
-int delFileOrDir(MYSQL *mysql,int pwdid);
-int rmCmdHelper(MYSQL *mysql,int uid,int pwdid,char *name,char type);
+int delFileOrDir(MYSQL* mysql, int pwdid);
+int rmCmdHelper(MYSQL* mysql, int uid, int pwdid, char type);
 void rmCmd(Task* task);
 void pwdCmd(Task* task);
 int getsCmd(Task* task);
