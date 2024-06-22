@@ -1,11 +1,14 @@
 #ifndef __NB_SERVER_H
 #define __NB_SERVER_H
 
+
 #include "dbpool.h"
 #include "log.h"
 #include "network.h"
 #include "parser.h"
 #include "threadpool.h"
+#include "timer.h"
+#include "hashmap.h"
 
 typedef struct {
     char port[8];
