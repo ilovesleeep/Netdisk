@@ -11,7 +11,8 @@
 #define BUFSIZE 4096
 #define MAXLINE 1024
 #define BIGFILE_SIZE (100 * 1024 * 1024)
-#define MMAPSIZE (1024 * 1024)
+#define MMAPSIZE (1024 * 1024 * 10)
+#define HASH_SIZE 32
 
 int sendFile(int sockfd, int fd, off_t f_size) {
     // 接收客户端想从哪里开始发
@@ -27,8 +28,8 @@ int sendFile(int sockfd, int fd, off_t f_size) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     if (send_bytes != 0) {
-        unsigned char md5sum_client[16];
-        recvn(sockfd, md5sum_client, sizeof(md5sum_client));
+        char md5sum_client[HASH_SIZE + 1];
+        recvn(sockfd, md5sum_client, HASH_SIZE);
         // 先根据收到的文件大小计算自己的哈希值(服务器的文件不可能有文件空洞)
         MD5_CTX ctx;
         MD5_Init(&ctx);
@@ -51,9 +52,14 @@ int sendFile(int sockfd, int fd, off_t f_size) {
         unsigned char md5sum[16];
         MD5_Final(md5sum, &ctx);
 
+        char md5_hex[HASH_SIZE + 1];
+        for (int i = 0; i < 16; i++) {
+            sprintf(md5_hex + (i * 2), "%02x", md5sum[i]);
+        }
+
         // 接收用户计算的md5值
         // 比较
-        if (memcmp(md5sum_client, md5sum, sizeof(md5sum)) != 0) {
+        if (memcmp(md5sum_client, md5sum, HASH_SIZE) != 0) {
             // 不是一个文件,重新来过吧
             int send_stat = 1;
             sendn(sockfd, &send_stat, sizeof(int));
@@ -120,8 +126,8 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
     recvn(sockfd, &fsize, sizeof(fsize));
 
     // 接收文件哈希值
-    unsigned char recv_hash[17] = {0};
-    recvn(sockfd, recv_hash, sizeof(recv_hash));
+    char recv_hash[HASH_SIZE + 1] = {0};
+    recvn(sockfd, recv_hash, HASH_SIZE);
 
     // 查看是否有同名文件
     char type = '\0';
@@ -139,15 +145,15 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
     if (file_id < 0 && type == 'f') {
         // 修改目录项
         file_id = -file_id;
-        updateRecord(mysql, file_id, NULL, NULL,
-                     (const unsigned char*)recv_hash, NULL, NULL, NULL, NULL);
-        int send_stat = 1;
+        updateRecord(mysql, file_id, NULL, NULL, (char*)recv_hash, NULL, NULL,
+                     NULL, NULL);
+        int send_stat = 0;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
     } else {
         off_t c_size = 0;
         file_id = insertRecord(mysql, p_id, u_id, (char*)recv_hash, block.data,
                                path, 'f', &fsize, &c_size, '0');
-        int send_stat = 1;
+        int send_stat = 0;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
     }
 
@@ -156,12 +162,12 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
     localFile(mysql, (char*)recv_hash, &f_size, &c_size);
     if (c_size == f_size && f_size != 0) {
         // 文件已存在且完整
+        printf("*****秒了\n");
         int send_stat = 0;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
 
-        updateRecord(mysql, file_id, NULL, NULL,
-                     (const unsigned char*)recv_hash, NULL, &f_size, &c_size,
-                     "1");
+        updateRecord(mysql, file_id, NULL, NULL, (char*)recv_hash, NULL,
+                     &f_size, &c_size, "1");
         return 0;
     } else {
         // 文件存在但不完整或文件不存在
@@ -175,7 +181,7 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
         return 1;
     }
     // 打开文件
-    int fd = open((const char*)recv_hash, O_RDWR | O_CREAT, 0666);
+    int fd = open((char*)recv_hash, O_RDWR | O_CREAT, 0666);
     if (fd == -1) {
         error(1, errno, "open");
     }
@@ -224,6 +230,8 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
             fflush(stdout);
         }
     }
+    updateRecord(mysql, file_id, NULL, NULL, NULL, NULL, NULL, &recv_bytes,
+                 "1");
     printf("[INFO] downloading %5.2lf%%\n", 100.0);
     close(fd);
     return 0;
@@ -604,9 +612,11 @@ int getsCmd(Task* task) {
     MYSQL* mysql = getDBConnection(task->dbpool);
     // 获取当前路径
     int pwdid = getPwdId(mysql, task->uid);
-
     // 发送文件
     char** parameter = task->args;
+    for (int i = 1; parameter[i]; i++) {
+        printf("******************%s\n", parameter[i]);
+    }
     for (int i = 1; parameter[i]; i++) {
         char file_name[512] = {0};
         int target_pwdid = pwdid;
@@ -674,7 +684,7 @@ int getsCmd(Task* task) {
         // 检查文件是否完整(不用检查了,我只会将完整的文件目录项设为1)
         off_t f_size;
         off_t c_size;
-        char f_hash[17] = {0};
+        char f_hash[HASH_SIZE + 1] = {0};
         getFileInfo(mysql, target_pwdid, f_hash, &f_size, &c_size);
         int fd = open(f_hash, O_RDWR);
         // 存在
@@ -686,7 +696,7 @@ int getsCmd(Task* task) {
         block.length = strlen(file_name);
         sendn(task->fd, &block, sizeof(int) + block.length);
         // 发送哈希值和文件大小
-        sendn(task->fd, f_hash, 16);
+        sendn(task->fd, f_hash, HASH_SIZE);
         sendn(task->fd, &f_size, sizeof(off_t));
         if (sendFile(task->fd, fd, f_size) == 1) {
             // sendfile中close了fd,若返回值为1证明连接中断,则不进行剩余发送任务

@@ -144,6 +144,7 @@ int threadsExit(ThreadPool* pool) {
 }
 
 int serverMain(ServerConfig* conf, HashTable* ht) {
+#if 0
     pipe(g_exit_pipe);
     pid_t pid = fork();
     switch (pid) {
@@ -166,7 +167,7 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
     // 子进程
     log_info("%d Kirov process reporting", getpid());
     close(g_exit_pipe[1]);
-
+#endif
     // init timerwheel
     HashMap* hashmap = hashmapCreate();
     HashedWheelTimer* timer = hwtCreate(WHEEL_SIZE + 1);
@@ -237,7 +238,7 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
 
                     // 添加到 epoll
                     epollAdd(epfd, connfd);
-                    epollMod(epfd, connfd, EPOLLIN | EPOLLONESHOT);
+                    //epollMod(epfd, connfd, EPOLLIN | EPOLLONESHOT);
 
                     // connfd update
                     int slot_idx = hashmapSearch(
@@ -258,6 +259,7 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
 
                     // 添加到 epoll
                     epollAdd(epfd, connfd);
+                    epollMod(epfd, connfd, EPOLLIN | EPOLLONESHOT);
 
                     // connfd update
                     int slot_idx = hashmapSearch(

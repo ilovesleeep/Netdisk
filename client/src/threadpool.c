@@ -24,6 +24,24 @@ static int touchTransferServer(int sockfd, Command cmd, Task* task) {
     return 0;
 }
 
+void freeUnusedParameter(char** parameter){
+    int i = 0, j = 0;
+    // 提取出 uid
+    while (parameter[i + 1] != NULL) {
+        ++i;
+    }  // p[i+1] == NULL, p[i]是最后一个元素
+    free(parameter[i]);
+    parameter[i] = NULL;
+
+    // 提取出 token
+    while (parameter[j + 1] != NULL) {
+        ++j;
+    }  // p[j+1] == NULL, p[j]是最后一个元素
+    free(parameter[j]);
+    parameter[j] = NULL;
+}
+
+
 void* eventLoop(void* arg) {
     ThreadPool* pool = (ThreadPool*)arg;
     pthread_t tid = pthread_self();
@@ -46,13 +64,14 @@ void* eventLoop(void* arg) {
         if (task->cmd == CMD_GETS1) {
             printf("进入阶段2\n");
             touchTransferServer(sockfd, CMD_GETS2, task);
-            sleep(5);
+            getsCmd(sockfd);
             // putsHandler(sockfd, task);
             printf("puts 完成\n");
         } else {
             printf("进入阶段2\n");
-            touchTransferServer(sockfd, CMD_GETS2, task);
-            sleep(5);
+            touchTransferServer(sockfd, CMD_PUTS2, task);
+            freeUnusedParameter(task->args);
+            putsCmd(sockfd, task->args);
             // getsHandler(sockfd, task);
             printf("gets 完成\n");
         }

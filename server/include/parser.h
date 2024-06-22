@@ -20,6 +20,8 @@ typedef enum {
     CMD_LOGIN1,
     CMD_LOGIN2,
     CMD_INFO_TOKEN,
+    CMD_EXIT,
+    CMD_STOP,
     CMD_UNKNOWN,
 } Command;
 
