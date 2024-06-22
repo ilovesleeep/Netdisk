@@ -278,7 +278,7 @@ int cdCmd(Task* task) {
         int pwd_len = strlen(pwd);
         send(task->fd, &pwd_len, sizeof(int), MSG_NOSIGNAL);
         send(task->fd, pwd, pwd_len, MSG_NOSIGNAL);
-        
+
         releaseDBConnection(task->dbpool, mysql);
         return 0;
     }
@@ -347,7 +347,8 @@ int cdCmd(Task* task) {
     return 0;
 }
 
-void lsCmd(Task* task) {
+#if 0
+void lsCmd1(Task* task) {
     // 告知客户端，接收当前命令的响应
     touchClient(task);
 
@@ -390,6 +391,68 @@ void lsCmd(Task* task) {
     }
 
     return;
+}
+#endif
+
+void lsCmd(Task* task) {
+    // 告知客户端，接收当前命令的响应
+    touchClient(task);
+    char** parameter = task->args;
+    if(parameter[2] != NULL || (parameter[1] && strcmp(parameter[1], "-l") != 0)){
+        int send_stat = 1;
+        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+        char error_info[] = "no such parameter";
+        int info_len = strlen(error_info);
+        send(task->fd, &info_len, sizeof(int), MSG_NOSIGNAL);
+        send(task->fd, error_info, info_len, MSG_NOSIGNAL);
+        return 0;
+    }
+    int send_stat = 0;
+    send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+
+    MYSQL* mysql = getDBConnection(task->dbpool);
+    int pwdid = getPwdId(mysql, task->uid);
+    if(parameter[1] == NULL){
+        int send_stat = 0;  //无参数接收
+        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+        char sql[100] = {0};
+        sprintf(sql, "SELECT type, name FROM nb_vftable WHERE p_id = %d AND exist = '1'", pwdid);
+        mysql_query(mysql, sql);
+        MYSQL_RES* res = mysql_store_result(mysql);
+        MYSQL_ROW row;
+        while((row = mysql_fetch_row(res))){
+            send(task->fd, row[0], 1, MSG_NOSIGNAL);
+            int send_len = strlen(row[1]);
+            send(task->fd, &send_len, sizeof(int), MSG_NOSIGNAL);
+            send(task->fd, row[1], send_len, MSG_NOSIGNAL);
+        }
+        send(task->fd, "\0", 1, MSG_NOSIGNAL);
+        mysql_free_result(res);
+    }
+    else{
+        int send_stat = 1;  //-l
+        send(task->fd, &send_stat, sizeof(int), MSG_NOSIGNAL);
+        char sql[100] = {0};
+        sprintf(sql, "SELECT type, name, f_size FROM nb_vftable WHERE p_id = %d AND exist = '1'", pwdid);
+        mysql_query(mysql, sql);
+        MYSQL_RES* res = mysql_store_result(mysql);
+        MYSQL_ROW row;
+        while((row = mysql_fetch_row(res))){
+            send(task->fd, row[0], 1, MSG_NOSIGNAL);
+            int send_len = strlen(row[1]);
+            send(task->fd, &send_len, sizeof(int), MSG_NOSIGNAL);
+            send(task->fd, row[1], send_len, MSG_NOSIGNAL);
+            if(row[0][0] == 'f'){
+                off_t f_size = 0;
+                f_size = atoi(row[2]);
+                send(task->fd, &f_size, sizeof(off_t), MSG_NOSIGNAL);
+            }
+        }
+        send(task->fd, "\0", 1, MSG_NOSIGNAL);
+        mysql_free_result(res);
+    }
+    releaseDBConnection(task->dbpool, mysql);
+    return 0;
 }
 
 int delFileOrDir(MYSQL *mysql,int pwdid) {
