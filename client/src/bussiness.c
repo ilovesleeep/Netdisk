@@ -6,7 +6,7 @@
 #define BUFSIZE 4096
 #define MAXLINE 1024
 #define BIGFILE_SIZE (100 * 1024 * 1024)
-#define MMAPSIZE (1024 * 1024 * 10)
+#define MMAPSIZE (10 * 1024 * 1024)
 #define HASH_SIZE 32
 
 typedef struct {
@@ -73,7 +73,7 @@ int sendFile(int sockfd, int fd) {
     unsigned char md5sum[16] = {0};
     MD5_Final(md5sum, &ctx);
 
-    //转换为看得懂的字符串类型
+    // 转换为看得懂的字符串类型
     char md5_hex[HASH_SIZE + 1];
     for (int i = 0; i < 16; i++) {
         sprintf(md5_hex + (i * 2), "%02x", md5sum[i]);
@@ -269,9 +269,8 @@ int recvFile(int sockfd) {
 
             recv_bytes += length;
 
-            printf("[INFO] downloading %5.2lf%%\r",
-                   100.0 * recv_bytes / f_size);
-            fflush(stdout);
+            log_info("downloading %5.2lf%%", 100.0 * recv_bytes / f_size);
+            // fflush(stdout);
         }
     } else {
         char buf[BUFSIZE];
@@ -284,12 +283,11 @@ int recvFile(int sockfd) {
 
             recv_bytes += length;
 
-            printf("[INFO] downloading %5.2lf%%\r",
-                   100.0 * recv_bytes / f_size);
-            fflush(stdout);
+            log_info("downloading %5.2lf%%", 100.0 * recv_bytes / f_size);
+            // fflush(stdout);
         }
     }
-    printf("[INFO] downloading %5.2lf%%\n", 100.0);
+    log_info("downloading %5.2lf%%", 100.0);
     close(fd);
     return 0;
 }
@@ -308,27 +306,10 @@ int cdCmd(int sockfd, char* cwd) {
         int pwd_len = 0;
         bzero(cwd, MAXLINE);
         recv(sockfd, &pwd_len, sizeof(int), MSG_WAITALL);
-        printf("cwd_len: %d\n", pwd_len);
         recv(sockfd, cwd, pwd_len, MSG_WAITALL);
-        printf("cwd: %s\n", cwd);
     }
     return 0;
 }
-
-#if 0
-int lsCmd1(int sockfd) {
-    char buf[BUFSIZE] = {0};
-    int buf_len = 0;
-    recv(sockfd, &buf_len, sizeof(int), MSG_WAITALL);
-    if (buf_len != 0) {
-        char buf[BUFSIZE] = {0};
-        recv(sockfd, buf, buf_len, MSG_WAITALL);
-        printf("%s\n", buf);
-    }
-
-    return 0;
-}
-#endif
 
 int lsCmd(int sockfd) {
     int recv_stat = 0;
@@ -345,15 +326,18 @@ int lsCmd(int sockfd) {
     }
 
     recv(sockfd, &recv_stat, sizeof(int), MSG_WAITALL);
+    int count = 0;
     switch (recv_stat) {
         case 0:
+            count = 0;
             for (;;) {
                 char type = '\0';
                 recv(sockfd, &type, 1, 0);
                 if (type == '\0') {
-                    printf("\n");
+                    if (count) printf("\n");
                     break;
                 }
+                ++count;
                 int info_len = 0;
                 recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
                 char name[256] = {0};
@@ -438,7 +422,7 @@ int getsCmd(int sockfd) {
         recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
         char error_info[1000] = {0};
         recv(sockfd, error_info, info_len, MSG_WAITALL);
-        puts(error_info);
+        log_error("%s", error_info);
         return -1;
     }
 
@@ -452,7 +436,7 @@ int getsCmd(int sockfd) {
             char recv_info[1000] = {0};
             recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
             recv(sockfd, recv_info, info_len, MSG_WAITALL);
-            puts(recv_info);
+            log_info("%s", recv_info);
             break;
         }
         // 文件存在则接收
@@ -468,7 +452,7 @@ int putsCmd(int sockfd, char** args) {
 
     // 参数错误
     if (args[1] == NULL) {
-        printf("parameter error\n");
+        printf("\nparameter error\n");
         int send_stat = 1;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
         return -1;
@@ -480,7 +464,7 @@ int putsCmd(int sockfd, char** args) {
         if (fd == -1) {
             int send_stat = 1;
             send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-            printf("path error : no find NO.%d file\n", i);
+            printf("\npath error : no find NO.%d file\n", i);
             return -1;
         }
 
@@ -509,19 +493,19 @@ int putsCmd(int sockfd, char** args) {
     }
     int send_stat = 1;
     send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-    printf("puts success\n");
+    // printf("\nputs success\n");
     return 0;
 }
 
 int mkdirCmd(int sockfd) {
     // 接收函数，大火车
-    int name_len = 0;
+    int msg_len = 0;
     // bufsize = 4096;
-    char filename[BUFSIZE] = {0};
-    recv(sockfd, &name_len, sizeof(int), MSG_WAITALL);
-    if (name_len != 0) {
-        recv(sockfd, filename, name_len, MSG_WAITALL);
-        printf("%s\n", filename);
+    char msg[BUFSIZE] = {0};
+    recv(sockfd, &msg_len, sizeof(int), MSG_WAITALL);
+    if (msg_len != 0) {
+        recv(sockfd, msg, msg_len, MSG_WAITALL);
+        printf("%s\n", msg);
     }
 
     return 0;

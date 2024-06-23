@@ -3,7 +3,7 @@
 #define BUFSIZE 1024
 
 static int touchTransferServer(int sockfd, Command cmd, Task* task) {
-    char data[BUFSIZE + BUFSIZE] = {0};
+    // char data[BUFSIZE * 2] = {0};
     char old_data[BUFSIZE] = {0};
 
     char** p = task->args;
@@ -11,20 +11,21 @@ static int touchTransferServer(int sockfd, Command cmd, Task* task) {
         strcat(old_data, p[i]);
         strcat(old_data, " ");
     }
-    printf("旧的请求： %s\n", data);
-    sprintf(data, "%s %s %d", old_data, task->token, task->uid);
-    printf("阶段2请求： %s\n", data);
-    int data_len = strlen(data);
+    // printf("旧的请求： %s\n", old_data);
+    //  sprintf(data, "%s %s %d", old_data, task->token, task->uid);
+    // sprintf(data, "%s", old_data);
+    // printf("阶段2请求： %s\n", data);
+    int data_len = strlen(old_data);
 
     int res_len = sizeof(cmd) + data_len;
     sendn(sockfd, &res_len, sizeof(int));
     sendn(sockfd, &cmd, sizeof(cmd));
-    sendn(sockfd, data, data_len);
+    sendn(sockfd, old_data, data_len);
 
     return 0;
 }
 
-void freeUnusedParameter(char** parameter){
+void freeUnusedParameter(char** parameter) {
     int i = 0, j = 0;
     // 提取出 uid
     while (parameter[i + 1] != NULL) {
@@ -41,7 +42,6 @@ void freeUnusedParameter(char** parameter){
     parameter[j] = NULL;
 }
 
-
 void* eventLoop(void* arg) {
     ThreadPool* pool = (ThreadPool*)arg;
     pthread_t tid = pthread_self();
@@ -56,26 +56,24 @@ void* eventLoop(void* arg) {
         }
 
         // 处理业务
+        log_debug("%lu Da! For mother China!", tid);
 
         int sockfd = tcpConnect(task->host, task->port);
 
-        log_debug("%lu Da! For mother China!", tid);
-
+        log_debug("start section 2");
         if (task->cmd == CMD_GETS1) {
-            printf("进入阶段2\n");
             touchTransferServer(sockfd, CMD_GETS2, task);
             getsCmd(sockfd);
-            // putsHandler(sockfd, task);
-            printf("puts 完成\n");
+            log_debug("section 2 end, gets success");
         } else {
-            printf("进入阶段2\n");
             touchTransferServer(sockfd, CMD_PUTS2, task);
             freeUnusedParameter(task->args);
             putsCmd(sockfd, task->args);
-            // getsHandler(sockfd, task);
-            printf("gets 完成\n");
+            log_debug("section 2 end, puts success");
         }
         freeTask(task);
+
+        close(sockfd);
 
         log_debug("%lu Ura! Waiting orders.\n", tid);
     }

@@ -28,6 +28,9 @@ int main(int argc, char* argv[]) {
         error(1, 0, "Usage: %s [host] [port]\n", argv[0]);
     }
 
+    // 更改工作目录为 ./newbee
+    chdir("./newbee");
+
     // 初始化客户端日志
     initLog();
 
@@ -51,18 +54,8 @@ int main(int argc, char* argv[]) {
     struct epoll_event* ready_events =
         (struct epoll_event*)calloc(MAXEVENTS, sizeof(struct epoll_event));
 
-    // CMD_INFO_TOKEN:
-    // 给调度服务器发获取token请求
-    char tokenmsg[] = "getToken";
-    int msg_len = strlen(tokenmsg);
-    // 先发长度
-    Command cmd_token = CMD_INFO_TOKEN;
-    int total_len = sizeof(cmd_token) + msg_len;
-    sendn(sockfd, &total_len, sizeof(int));
-    // 再发内容
-    sendn(sockfd, &cmd_token, sizeof(cmd_token));
-    sendn(sockfd, tokenmsg, msg_len);
-    printf("send tokenmsg ok\n");
+    // 获取 token
+    getToken(sockfd);
 
     // 打印提示符
     strncpy(g_host, argv[1], MAX_HOST_LENGTH);
@@ -71,6 +64,7 @@ int main(int argc, char* argv[]) {
     // 将 STDIN_FILENO 加入 epoll
     epollAdd(epfd, STDIN_FILENO);
 
+    log_info("all ready");
     // 主循环
     while (1) {
         int nready = epoll_wait(epfd, ready_events, MAXEVENTS, -1);
@@ -82,7 +76,7 @@ int main(int argc, char* argv[]) {
                 int buf_len = read(STDIN_FILENO, buf, BUFSIZE);
                 buf[--buf_len] = '\0';  // -1 for '\n'
 
-                log_debug("用户输入：'%s'", buf);
+                // log_debug("用户输入：'%s'", buf);
 
                 // 解析请求
                 char** args = parseRequest(buf);
@@ -101,19 +95,6 @@ int main(int argc, char* argv[]) {
                 } else if (cmd == CMD_GETS1 || cmd == CMD_PUTS1) {
                     /*
                     // 更新 token
-                    // CMD_INFO_TOKEN:
-                    // 给调度服务器发获取token请求
-                    // 先发长度
-                    Command cmd_token = CMD_INFO_TOKEN;
-                    int total_len = sizeof(cmd_token) + buf_len;
-                    sendn(sockfd, &total_len, sizeof(int));
-                    // 再发内容
-                    sendn(sockfd, &cmd_token, sizeof(cmd_token));
-                    sendn(sockfd, buf, buf_len);
-
-                    // 接收
-                    // getNewConnectionInfo(sockfd, g_new_host, g_new_port,
-                    //                     g_token);
                     */
 
                     // 给请求加上 token
@@ -190,7 +171,7 @@ void welcome(int sockfd, char* username) {
         switch (option) {
             case 1:
                 userLogin(sockfd, username, g_cwd);
-                // system("clear");
+                system("clear");
                 printf(
                     "\033[47;30m Sir, this way! What can I do for you? "
                     "\033[0m\n\n");
@@ -237,7 +218,7 @@ int getNewConnectionInfo(int sockfd, int* uid, char* new_host, char* new_port,
     recv(sockfd, conn_data, data_len, MSG_WAITALL);
 
     // printf("get token info:\n host: [%s]\n port: [%s]\n token[%s]\n"m )
-    printf("获取到认证信息：\n %s \n", conn_data);
+    // printf("获取到认证信息：\n %s \n", conn_data);
 
     //  info_list[0]: uid, info_list[1]: host
     //  info_list[2]: port, info_list[3]: token
@@ -254,27 +235,6 @@ int getNewConnectionInfo(int sockfd, int* uid, char* new_host, char* new_port,
 
     return 0;
 }
-/*
-char** getNewTaskInfo(char* res_data) { return parseRequest(res_data); }
-
-Task* getNewConnectionTask(Command cmd, char* res_data) {
-    // 响应内容中包含了：资源服务器 host，端口 port 令牌 token 等其他信息
-    // 解析响应内容，获取新的连接需要的信息，创建新连接(长命令)任务
-
-    // info[0] host, info[1]: port, info[2]: token
-    char** info = getNewTaskInfo(res_data);
-
-    Task* task = (Task*)malloc(sizeof(Task));
-    task->cmd = cmd;
-    task->host = strdup(info[0]);
-    task->port = strdup(info[1]);
-    task->token = strdup(info[2]);
-
-    freeStringArray(info);
-
-    return task;
-}
-*/
 
 Task* makeLongTask(Command cmd, char* res_data, int uid, char* new_host,
                    char* new_port, char* token) {
@@ -314,10 +274,11 @@ int responseHandler(int sockfd, ThreadPool* pool) {
                     return 0;
                 case CMD_PUTS1:
                 case CMD_GETS1:
-                    printf("阶段 1 结束\n");
+                    log_debug("section 1 done");
                     task = makeLongTask(cmd, res_data, g_uid, g_new_host,
                                         g_new_port, g_token);
                     blockqPush(pool->task_queue, task);
+                    printPrompt();
                     return 0;
 
                 case CMD_CD:

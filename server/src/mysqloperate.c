@@ -14,7 +14,6 @@ int getPwdId(MYSQL* mysql, int uid) {
     MYSQL_ROW row;
     row = mysql_fetch_row(res);
     pwdid = atoi(row[0]);
-    log_debug("kong： pwdid  =  %d\n", pwdid);
     mysql_free_result(res);
 
     return pwdid;
@@ -148,7 +147,7 @@ int getPwd(MYSQL* mysql, int pwdid, char* path, int path_size) {
             break;
         }
         // 打印一行数据
-        log_debug("path: %s", path);
+        // log_debug("user cwd: %s", path);
     }
 
     mysql_stmt_free_result(stmt);
@@ -216,16 +215,14 @@ int insertRecord(MYSQL* mysql, int p_id, int u_id, char* f_hash, char* name,
                 p_id, u_id, path, type, exist);
     } else {
         // 有哈希值,一定是插入文件
+        log_info("file hash is: %s", f_hash);
         sprintf(sql,
                 "INSERT INTO nb_vftable(p_id, u_id, f_hash, name, path, type, "
-                "f_size, c_size, exist) VALUES(%d, %d, '%s', ?, '%s', '%c', %ld, %ld, "
+                "f_size, c_size, exist) VALUES(%d, %d, '%s', ?, '%s', '%c', "
+                "%ld, %ld, "
                 "'%c')",
                 p_id, u_id, f_hash, path, type, *f_size, *c_size, exist);
     }
-for(int i = 0; i < 16; i++){   
-printf("%02x", f_hash[i]);
-}
-printf("\n");
     MYSQL_STMT* stmt = mysql_stmt_init(mysql);
 
     int ret = mysql_stmt_prepare(stmt, sql, strlen(sql));
@@ -291,10 +288,13 @@ int getFileInfo(MYSQL* mysql, int pwdid, char* f_hash, off_t* f_size,
 
 // 传入文件哈希值,通过传参返回文件大小和现存最大文件大小
 int localFile(MYSQL* mysql, char* f_hash, off_t* f_size, off_t* c_size) {
+    *f_size = 0;
+    *c_size = 0;
     char sql[] = "SELECT f_size, c_size FROM nb_vftable WHERE f_hash = ?";
+
     MYSQL_STMT* stmt = mysql_stmt_init(mysql);
     int ret = mysql_stmt_prepare(stmt, sql, strlen(sql));
-    if(ret == 1){
+    if (ret == 1) {
         printf("%s", mysql_stmt_error(stmt));
     }
 
@@ -308,31 +308,37 @@ int localFile(MYSQL* mysql, char* f_hash, off_t* f_size, off_t* c_size) {
     bind.is_null = 0;
 
     ret = mysql_stmt_bind_param(stmt, &bind);
-    if(ret == 1){
+    if (ret == 1) {
         printf("%s", mysql_stmt_error(stmt));
     }
+
     ret = mysql_stmt_execute(stmt);
-    if(ret == 1){
+    if (ret == 1) {
         printf("%s", mysql_stmt_error(stmt));
     }
+
     MYSQL_RES* res = mysql_stmt_result_metadata(stmt);
 
     MYSQL_BIND res_bind[2];
     res_bind[0].buffer_type = MYSQL_TYPE_LONGLONG;
-    res_bind[0].buffer = f_size;
-    res_bind[0].buffer_length = sizeof(off_t);
+    res_bind[0].buffer = (long long*)f_size;
+    res_bind[0].buffer_length = sizeof(long long);
 
     off_t max_size = 0;
     res_bind[1].buffer_type = MYSQL_TYPE_LONGLONG;
-    res_bind[1].buffer = &max_size;
-    res_bind[1].buffer_length = sizeof(off_t);
+    res_bind[1].buffer = (long long*)&max_size;
+    res_bind[1].buffer_length = sizeof(long long);
 
     ret = mysql_stmt_bind_result(stmt, res_bind);
+    if (ret) {
+        log_error("%s", mysql_stmt_error(stmt));
+    }
 
     ret = mysql_stmt_store_result(stmt);
+    if (ret) {
+        log_error("%s", mysql_stmt_error(stmt));
+    }
 
-    *f_size = 0;
-    *c_size = 0;
     for (;;) {
         ret = mysql_stmt_fetch(stmt);
         if (ret == 1 || ret == MYSQL_NO_DATA) {
@@ -347,8 +353,8 @@ int localFile(MYSQL* mysql, char* f_hash, off_t* f_size, off_t* c_size) {
 
 // 想修改的就传入指针,不想更改的就传NULL
 int updateRecord(MYSQL* mysql, int pwdid, const int* p_id, const int* u_id,
-                 const char* f_hash, const char* type,
-                 const off_t* f_size, const off_t* c_size, const char* exist) {
+                 const char* f_hash, const char* type, const off_t* f_size,
+                 const off_t* c_size, const char* exist) {
     int i = 0;
     char sql[256] = "UPDATE nb_vftable SET ";
     if (p_id) {

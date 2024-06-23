@@ -164,15 +164,15 @@ void initLog(void) {
     char filename[64];
     strftime(filename, SIZE(filename), "./client_log_%Y_%m_%d.log", local_time);
 
-    LogConfig conf = {"init_log_path", LOG_DEBUG, false};
+    LogConfig conf = {"", LOG_INFO, true};
+    strcpy(conf.filename, filename);
 
     // 打开文件用于追加，若文件不存在则创建
-    FILE* fp = fopen(filename, "a");
+    FILE* fp = fopen(conf.filename, "a");
     if (fp == NULL) {
         error(1, 0, "create log file failed.");
     }
-    printf("set log filename: %s\n", filename);
     log_add_fp(fp, conf.level);
     log_set_quiet(conf.quiet);
-    log_set_level(conf.level);
+    // log_set_level(conf.level);
 }

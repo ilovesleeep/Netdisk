@@ -5,6 +5,22 @@
 #define MAXLINE 1024
 #define MAX_NAME_LENGTH 20
 
+int getToken(int sockfd) {
+    // 给调度服务器发获取token请求
+    // CMD_INFO_TOKEN:
+    Command cmd_token = CMD_INFO_TOKEN;
+    char tokenmsg[] = "getToken";
+    int msg_len = strlen(tokenmsg);
+    // 先发长度
+    int total_len = sizeof(cmd_token) + msg_len;
+    sendn(sockfd, &total_len, sizeof(int));
+    // 再发内容
+    sendn(sockfd, &cmd_token, sizeof(cmd_token));
+    sendn(sockfd, tokenmsg, msg_len);
+
+    return 0;
+}
+
 static int userRegister1(int sockfd, char* username, char* salt);
 static int userRegister2(int sockfd, char* username, char* salt);
 
@@ -28,7 +44,7 @@ static int userRegister1(int sockfd, char* username, char* salt) {
         if (name_len > MAX_NAME_LENGTH) {
             printf("Max name length is 20, please re-enter\n");
             continue;
-        } else if (name_len < 1) {  // name == "\n"
+        } else if (name_len <= 1) {  // name == "\n"
             printf("Min name length is 1, please re-enter\n");
             continue;
         }
@@ -153,7 +169,7 @@ static int userLogin1(int sockfd, char* name, char* salt) {
         if (name_len > MAX_NAME_LENGTH) {
             printf("Max name length is 20, please re-enter\n");
             continue;
-        } else if (name_len < 1) {  // name == "\n"
+        } else if (name_len <= 1) {  // name == "\n"
             printf("Min name length is 1, please re-enter\n");
             continue;
         }
@@ -240,7 +256,7 @@ static int userLogin2(int sockfd, char* cwd, char* salt) {
             bzero(cwd, MAXLINE);
             recv(sockfd, &cwd_len, sizeof(cwd_len), MSG_WAITALL);
             recv(sockfd, cwd, cwd_len, MSG_WAITALL);
-            printf("cwd='%s'\n", cwd);
+            // printf("cwd='%s'\n", cwd);
             break;
         }
     }

@@ -136,15 +136,10 @@ int threadsExit(ThreadPool* pool) {
     for (int j = 0; j < pool->num_threads; j++) {
         pthread_join(pool->threads[j], NULL);
     }
-
-    // 主线程退出
-    // log_info("For home country, see you!");
-    // pthread_exit(0);
     return 0;
 }
 
 int serverMain(ServerConfig* conf, HashTable* ht) {
-#if 0
     pipe(g_exit_pipe);
     pid_t pid = fork();
     switch (pid) {
@@ -167,12 +162,13 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
     // 子进程
     log_info("%d Kirov process reporting", getpid());
     close(g_exit_pipe[1]);
-#endif
+
+    // 更改工作目录为 ./user
+    chdir("./user");
+
     // init timerwheel
     HashMap* hashmap = hashmapCreate();
     HashedWheelTimer* timer = hwtCreate(WHEEL_SIZE + 1);
-
-    chdir("./user");
 
     // epoll
     int epfd = epoll_create(1);
@@ -238,7 +234,7 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
 
                     // 添加到 epoll
                     epollAdd(epfd, connfd);
-                    //epollMod(epfd, connfd, EPOLLIN | EPOLLONESHOT);
+                    // epollMod(epfd, connfd, EPOLLIN | EPOLLONESHOT);
 
                     // connfd update
                     int slot_idx = hashmapSearch(

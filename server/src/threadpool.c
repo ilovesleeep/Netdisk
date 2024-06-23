@@ -13,6 +13,7 @@ static int touchClient(Task* task, Command cmd) {
         strcat(old_data, " ");
     }
     sprintf(data, "%s %s %d", old_data, task->token, task->uid);
+    log_debug("data: %s", data);
     int data_len = strlen(data);
 
     int res_len = sizeof(Command) + data_len;
@@ -23,16 +24,16 @@ static int touchClient(Task* task, Command cmd) {
     return 0;
 }
 
-void freeUnusedParameter(char** parameter){
+void freeUnusedParameter(char** parameter) {
     int i = 0, j = 0;
-    // 提取出 uid
+    // free uid
     while (parameter[i + 1] != NULL) {
         ++i;
     }  // p[i+1] == NULL, p[i]是最后一个元素
     free(parameter[i]);
     parameter[i] = NULL;
 
-    // 提取出 token
+    // free token
     while (parameter[j + 1] != NULL) {
         ++j;
     }  // p[j+1] == NULL, p[j]是最后一个元素
@@ -46,7 +47,11 @@ static int tellClient(int connfd, int* user_table) {
     char token[MAX_TOKEN_SIZE] = {0};
     makeToken(token, user_table[connfd]);
 
-    // 发送连接信息 (uid, host, port, token)
+    // 发送连接信息 (host, port, token, uid)
+    // 多个服务器，比如有3个，(3，host+port, host+port, host+port, )
+    //)
+    // sprintf(conn_data, "%s %s %s %d", "localhost", "30002", token,
+    //        user_table[connfd]);
     char conn_data[1024] = {0};
     sprintf(conn_data, "%d %s %s %s", user_table[connfd], "localhost", "30002",
             token);
@@ -75,32 +80,33 @@ void* eventLoop(void* arg) {
 
         log_debug("%lu Da! For mother China!", tid);
 
-        int retval = -1;
+        int ret = -1;
         switch (task->cmd) {
-            case CMD_INFO_TOKEN:
-                // 告知客户端新连接信息和token
+            case CMD_INFO_TOKEN:  // 告知客户端新连接信息和token
                 touchClient(task, CMD_INFO_TOKEN);
-                tellClient(task->fd, task->u_table);
+                tellClient(connfd, task->u_table);
                 break;
             case CMD_PUTS1:
             case CMD_GETS1:
                 if (checkToken(task->token, task->uid) == 0) {
-                    printf("阶段1 成功\n");
+                    log_debug("[%d] Authentication section 1 success",
+                              task->uid);
                     touchClient(task, task->cmd);
                     break;
                 } else {
-                    printf("阶段1 失败\n");
+                    log_warn("[%d]Authentication section 1 failed", task->uid);
                     break;
                 }
             case CMD_PUTS2:
             case CMD_GETS2:
                 if (checkToken(task->token, task->uid) == 0) {
-                    printf("阶段2 成功\n");
-                    freeUnusedParameter(task->args);
-                    retval = taskHandler(task);
+                    log_debug("[%d] Authentication section 2 success",
+                              task->uid);
+                    // freeUnusedParameter(task->args);
+                    ret = taskHandler(task);
                     char* tmp = task->cmd == CMD_GETS2 ? "gets" : "puts";
-                    printf("执行 %s 完成\n", tmp);
-                    if (retval != 1) {
+                    log_debug("%s done", tmp);
+                    if (ret != 1) {
                         epollMod(pool->epfd, connfd, EPOLLIN | EPOLLONESHOT);
                     } else {
                         epollDel(pool->epfd, connfd);
@@ -108,25 +114,16 @@ void* eventLoop(void* arg) {
                     }
                     break;
                 } else {
-                    printf("阶段2 失败\n");
+                    log_warn("[%d] Authentication section 2 failed", task->uid);
                     break;
                 }
-            default:
-                // 短命令
+            default:  // 短命令
                 taskHandler(task);
                 break;
         }
         freeTask(task);
 
         log_debug("%lu Ura! Waiting orders.\n", tid);
-
-        // if (retval != 1) {
-        //     epollMod(pool->epfd, connfd, EPOLLIN | EPOLLONESHOT);
-        // } else {
-        //     epollDel(pool->epfd, connfd);
-        //     close(connfd);
-        // }
-        // epollAdd(pool->epfd, connfd);
     }
 }
 

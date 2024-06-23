@@ -59,7 +59,7 @@ int sendFile(int sockfd, int fd, off_t f_size) {
 
         // 接收用户计算的md5值
         // 比较
-        if (memcmp(md5sum_client, md5sum, HASH_SIZE) != 0) {
+        if (memcmp(md5sum_client, md5_hex, HASH_SIZE) != 0) {
             // 不是一个文件,重新来过吧
             int send_stat = 1;
             sendn(sockfd, &send_stat, sizeof(int));
@@ -158,7 +158,7 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
     }
 
     // 查表查看是否文件存在(f_hash)(是否可以续传)
-    off_t f_size, c_size;
+    off_t f_size = 0, c_size = 0;
     localFile(mysql, (char*)recv_hash, &f_size, &c_size);
     if (c_size == f_size && f_size != 0) {
         // 文件已存在且完整
@@ -208,8 +208,8 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
 
             recv_bytes += length;
 
-            printf("[INFO] downloading %5.2lf%%\r", 100.0 * recv_bytes / fsize);
-            fflush(stdout);
+            log_info("downloading %5.2lf%%", 100.0 * recv_bytes / fsize);
+            // fflush(stdout);
         }
     } else {
         char buf[BUFSIZE];
@@ -226,13 +226,13 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
 
             recv_bytes += length;
 
-            printf("[INFO] downloading %5.2lf%%\r", 100.0 * recv_bytes / fsize);
-            fflush(stdout);
+            log_info("downloading %5.2lf%%", 100.0 * recv_bytes / fsize);
+            // fflush(stdout);
         }
     }
     updateRecord(mysql, file_id, NULL, NULL, NULL, NULL, NULL, &recv_bytes,
                  "1");
-    printf("[INFO] downloading %5.2lf%%\n", 100.0);
+    log_info("downloading %5.2lf%%", 100.0);
     close(fd);
     return 0;
 }
@@ -453,7 +453,7 @@ int rmCmdHelper(MYSQL* mysql, int uid, int pwdid, char type) {
         MYSQL_RES* res = mysql_store_result(mysql);
         MYSQL_ROW row;
 
-        while (row = mysql_fetch_row(res)) {
+        while ((row = mysql_fetch_row(res))) {
             int childpwdid = atoi(row[0]);  // 获取目录id
 
             char type = getTypeById(mysql, childpwdid);

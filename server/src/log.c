@@ -222,7 +222,7 @@ void setLogQuiet(HashTable* ht, LogConfig* conf) {
 }
 
 void initLog(HashTable* ht) {
-    LogConfig conf = {"log.txt", LOG_UNKNOW, 1};
+    LogConfig conf = {"log.txt", LOG_UNKNOW, true};
     // parseConfig(&conf);
 
     setLogFilename(ht, &conf);

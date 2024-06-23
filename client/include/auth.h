@@ -5,6 +5,7 @@
 #include "head.h"
 
 void getSetting(char* salt, char* passwd);
+int getToken(int sockfd);
 
 int userRegister(int sockfd);
 int userLogin(int sockfd, char* name, char* cwd);

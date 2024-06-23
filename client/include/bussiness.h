@@ -2,6 +2,7 @@
 #define __NB_BUSSINESS_H
 
 #include "head.h"
+#include "log.h"
 #include "parser.h"
 #include "task.h"
 

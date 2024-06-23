@@ -18,7 +18,7 @@ int makeToken(char* token, int uid) {
     sprintf(user, "nbuser %d", uid);
     params.iss = "NewBee Netdisk";  // 该 jwt 签发者
     params.sub = user;              // 该 jwt 面向的用户
-    params.aud = "Administrator";   // 接收该jwt的一方
+    params.aud = "NewBee Client";   // 接收该jwt的一方
 
     /* Set to expire after 10 minutes (600 seconds). */
     // unix 时间戳
@@ -34,8 +34,8 @@ int makeToken(char* token, int uid) {
 
     int r = l8w8jwt_encode(&params);
 
-    printf("\n l8w8jwt HS512 token: %s \n",
-           r == L8W8JWT_SUCCESS ? jwt : " (encoding failure) ");
+    // printf("\n l8w8jwt HS512 token: %s \n",
+    //        r == L8W8JWT_SUCCESS ? jwt : " (encoding failure) ");
 
     bzero(token, MAX_TOKEN_SIZE);
     strcpy(token, jwt);
@@ -48,8 +48,7 @@ int makeToken(char* token, int uid) {
 
 // 成功返回 0， 失败返回 1
 int checkToken(char* token, int uid) {
-    printf("check 开始：\nuid: %d\n", uid);
-    printf("token: %s\ncheck 结束\n", token);
+    log_info("Token Checking ... \n%s\n", token);
 
     char* jwt = token;
 
@@ -85,24 +84,12 @@ int checkToken(char* token, int uid) {
 
     if (decode_result == L8W8JWT_SUCCESS &&
         validation_result == L8W8JWT_VALID) {
-        printf("\n NewBee HS512 token validation successful! \n");
+        log_info("NewBee HS512 token validation successful! \n");
         return 0;
     } else {
-        printf("\n NewBee HS512 token validation failed! \n");
+        log_warn("NewBee HS512 token validation failed! \n");
         return 1;
     }
-
-    /*
-     * decode_result describes whether decoding/parsing the token succeeded or
-     * failed; the output l8w8jwt_validation_result variable contains actual
-     * information about JWT signature verification status and claims validation
-     * (e.g. expiration check).
-     *
-     * If you need the claims, pass an (ideally stack pre-allocated) array of
-     * struct l8w8jwt_claim instead of NULL,NULL into the corresponding
-     * l8w8jwt_decode() function parameters. If that array is heap-allocated,
-     * remember to free it yourself!
-     */
 }
 
 char* generateSalt(void) {
