@@ -14,7 +14,6 @@ int getPwdId(MYSQL* mysql, int uid) {
     MYSQL_ROW row;
     row = mysql_fetch_row(res);
     pwdid = atoi(row[0]);
-    log_debug("kong： pwdid  =  %d\n", pwdid);
     mysql_free_result(res);
 
     return pwdid;
@@ -218,7 +217,8 @@ int insertRecord(MYSQL* mysql, int p_id, int u_id, char* f_hash, char* name,
         // 有哈希值,一定是插入文件
         sprintf(sql,
                 "INSERT INTO nb_vftable(p_id, u_id, f_hash, name, path, type, "
-                "f_size, c_size, exist) VALUES(%d, %d, '%s', ?, '%s', '%c', %ld, %ld, "
+                "f_size, c_size, exist) VALUES(%d, %d, '%s', ?, '%s', '%c', "
+                "%ld, %ld, "
                 "'%c')",
                 p_id, u_id, f_hash, path, type, *f_size, *c_size, exist);
     }
@@ -292,7 +292,7 @@ int localFile(MYSQL* mysql, char* f_hash, off_t* f_size, off_t* c_size) {
     char sql[] = "SELECT f_size, c_size FROM nb_vftable WHERE f_hash = ?";
     MYSQL_STMT* stmt = mysql_stmt_init(mysql);
     int ret = mysql_stmt_prepare(stmt, sql, strlen(sql));
-    if(ret == 1){
+    if (ret == 1) {
         printf("%s", mysql_stmt_error(stmt));
     }
 
@@ -306,11 +306,11 @@ int localFile(MYSQL* mysql, char* f_hash, off_t* f_size, off_t* c_size) {
     bind.is_null = 0;
 
     ret = mysql_stmt_bind_param(stmt, &bind);
-    if(ret == 1){
+    if (ret == 1) {
         printf("%s", mysql_stmt_error(stmt));
     }
     ret = mysql_stmt_execute(stmt);
-    if(ret == 1){
+    if (ret == 1) {
         printf("%s", mysql_stmt_error(stmt));
     }
     // MYSQL_RES* res = mysql_stmt_result_metadata(stmt);
@@ -344,8 +344,8 @@ int localFile(MYSQL* mysql, char* f_hash, off_t* f_size, off_t* c_size) {
 
 // 想修改的就传入指针,不想更改的就传NULL
 int updateRecord(MYSQL* mysql, int pwdid, const int* p_id, const int* u_id,
-                 const char* f_hash, const char* type,
-                 const off_t* f_size, const off_t* c_size, const char* exist) {
+                 const char* f_hash, const char* type, const off_t* f_size,
+                 const off_t* c_size, const char* exist) {
     int i = 0;
     char sql[256] = "UPDATE nb_vftable SET ";
     if (p_id) {
@@ -408,7 +408,5 @@ int updateRecord(MYSQL* mysql, int pwdid, const int* p_id, const int* u_id,
 
     int ret = mysql_query(mysql, sql);
 
-    MYSQL* res = mysql_store_result(mysql);
-    mysql_free_result(res);
     return 0;
 }

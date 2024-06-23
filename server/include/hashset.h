@@ -1,8 +1,10 @@
 #ifndef __HASH_SET__
 #define __HASH_SET__
 
-#include "head.h"
 #include <stdint.h>
+
+#include "head.h"
+#include "log.h"
 
 typedef struct setnode {
     int key;

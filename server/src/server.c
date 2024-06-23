@@ -77,6 +77,7 @@ static int requestHandler(int connfd, ThreadPool* short_pool,
     log_debug("recv total len %d", request_len);
 
     if (request_len > 0) {  // 接收到了有效长度
+        log_info("recv request from connection %d", connfd);
         Command cmd = -1;
         char request_data[MAXLINE] = {0};
         int data_len = request_len - sizeof(cmd);
@@ -221,6 +222,8 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
             hwtClear(timer);
             timer->curr_idx = (timer->curr_idx + 1) % timer->size;
             timeout = TIMEOUT;
+            clock_gettime(CLOCK_MONOTONIC, &start);
+            continue;
         } else {
             for (int i = 0; i < nready; i++) {
                 if (ready_events[i].data.fd == listenfd) {
@@ -304,7 +307,7 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
             timeout -= (end.tv_sec - start.tv_sec) * 1000 +
                        (end.tv_nsec - start.tv_nsec) / 1000000;
             if (timeout <= 0) {
-                timeout = TIMEOUT;
+                timeout = 0;
             }
             clock_gettime(CLOCK_MONOTONIC, &start);
         }

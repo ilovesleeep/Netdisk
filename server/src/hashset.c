@@ -25,7 +25,7 @@ HashSet* hashsetCreate(void) {
 
 void hashsetDestroy(HashSet* set) {
     for (int i = 0; i < set->capacity; ++i) {
-        SetNode* curr = set->buckets[i]; // 链表头
+        SetNode* curr = set->buckets[i];  // 链表头
         while (curr) {
             SetNode* next = curr->next;
             free(curr);
@@ -37,7 +37,7 @@ void hashsetDestroy(HashSet* set) {
 }
 
 // murmurhash2
-static uint32_t hash(const void* key, int len, uint32_t seed) {
+static uint32_t hashS(const void* key, int len, uint32_t seed) {
     const uint32_t m = 0x5bd1e995;
     const int r = 24;
     uint32_t h = seed ^ len;
@@ -59,12 +59,14 @@ static uint32_t hash(const void* key, int len, uint32_t seed) {
         len -= 4;
     }
 
-    switch (len)
-    {
-    case 3: h ^= data[2] << 16;
-    case 2: h ^= data[1] << 8;
-    case 1: h ^= data[0];
-        h *= m;
+    switch (len) {
+        case 3:
+            h ^= data[2] << 16;
+        case 2:
+            h ^= data[1] << 8;
+        case 1:
+            h ^= data[0];
+            h *= m;
     };
 
     h ^= h >> 13;
@@ -93,7 +95,6 @@ static long long quickPow(long long base, long long exponent, long long mod) {
     return result;
 }
 
-
 // Miller-Rabin
 static bool millerRabin(int n) {
     srand((unsigned)time(NULL));
@@ -108,8 +109,8 @@ static bool millerRabin(int n) {
         if (v == 1) continue;
         int s;
         for (s = 0; s < t; ++s) {
-        if (v == n - 1) break;  // 得到平凡平方根 n-1，通过此轮测试
-        v = (long long)v * v % n;
+            if (v == n - 1) break;  // 得到平凡平方根 n-1，通过此轮测试
+            v = (long long)v * v % n;
         }
         // 如果找到了非平凡平方根，则会由于无法提前 break; 而运行到 s == t
         // 如果 Fermat 素性测试无法通过，则一直运行到 s == t 前 v 都不会等于 -1
@@ -118,10 +119,9 @@ static bool millerRabin(int n) {
     return 1;
 }
 
-
 static int findFirstPrime(int num) {
     while (1) {
-        if(millerRabin(num)) break;
+        if (millerRabin(num)) break;
         num++;
     }
     return num;
@@ -136,7 +136,7 @@ static void hashsetResize(HashSet* set) {
     set->size = 0;
 
     for (int i = 0; i < old_capacity; ++i) {
-        SetNode* curr= old_buckets[i];
+        SetNode* curr = old_buckets[i];
         while (curr) {
             SetNode* next = curr->next;
             hashsetInsert(set, curr->key);
@@ -153,7 +153,7 @@ void hashsetInsert(HashSet* set, int key) {
         hashsetResize(set);
     }
 
-    int idx = hash(&key, sizeof(key), set->hashseed) % set->capacity;
+    int idx = hashS(&key, sizeof(key), set->hashseed) % set->capacity;
     SetNode* curr = set->buckets[idx];
 
     // 是否存在
@@ -162,11 +162,11 @@ void hashsetInsert(HashSet* set, int key) {
             return;
         }
         curr = curr->next;
-    } // 不存在
+    }  // 不存在
 
     SetNode* newSetnode = (SetNode*)malloc(sizeof(SetNode));
     newSetnode->key = key;
-    newSetnode->next = set->buckets[idx]; // 头插法
+    newSetnode->next = set->buckets[idx];  // 头插法
     set->buckets[idx] = newSetnode;
 
     set->size++;
@@ -175,7 +175,7 @@ void hashsetInsert(HashSet* set, int key) {
 
 // 1 找到，0 没找到
 int hashsetSearch(HashSet* set, int key) {
-    int idx = hash(&key, sizeof(key), set->hashseed) % set->capacity;
+    int idx = hashS(&key, sizeof(key), set->hashseed) % set->capacity;
     SetNode* curr = set->buckets[idx];
     while (curr) {
         if (curr->key == key) {
@@ -184,17 +184,17 @@ int hashsetSearch(HashSet* set, int key) {
         curr = curr->next;
     }
 
-    return 0; 
+    return 0;
 }
 
 void hashsetDelete(HashSet* set, int key) {
-    int idx = hash(&key, sizeof(key), set->hashseed) % set->capacity;
+    int idx = hashS(&key, sizeof(key), set->hashseed) % set->capacity;
     SetNode* pre = NULL;
     SetNode* curr = set->buckets[idx];
     while (curr) {
-        if(curr->key == key) {
+        if (curr->key == key) {
             if (pre == NULL) {
-                set->buckets[idx] = curr->next; // curr是第一个
+                set->buckets[idx] = curr->next;  // curr是第一个
             } else {
                 pre->next = curr->next;
             }
@@ -207,7 +207,6 @@ void hashsetDelete(HashSet* set, int key) {
     }
 }
 
-
 void hashsetClear(HashSet* set) {
     if (set->size == 0) return;
     for (int i = 0; i < set->capacity; ++i) {
@@ -215,6 +214,7 @@ void hashsetClear(HashSet* set) {
         while (curr != NULL) {
             SetNode* temp = curr;
             curr = curr->next;
+            log_info("connection %d timeout, kick it out", temp->key);
             close(temp->key);
             free(temp);
         }

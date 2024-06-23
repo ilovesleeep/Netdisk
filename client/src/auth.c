@@ -98,6 +98,8 @@ static int userRegister2(int sockfd, char* username, char* salt) {
     while (1) {
         char* passwd = NULL;
         char* confirm_passwd = NULL;
+        char s1[64] = {0};
+        char s2[64] = {0};
         int count = 0;
         do {
             if (++count == 3) {
@@ -109,8 +111,10 @@ static int userRegister2(int sockfd, char* username, char* salt) {
                 printf("The two entries are invalid, please re-enter\n");
             }
             passwd = getpass("Password: ");
+            strcpy(s1, passwd);
             confirm_passwd = getpass("Confirm password: ");
-        } while (strcmp(passwd, confirm_passwd) != 0 || passwd[0] == '\0');
+            strcpy(s2, confirm_passwd);
+        } while (strcmp(s1, s2) != 0 || s1[0] == '\0');
 
         // 加密
         char* encrytped = crypt(passwd, salt);
@@ -136,7 +140,8 @@ static int userRegister2(int sockfd, char* username, char* salt) {
             // 1秒后返回主界面
             printf(
                 "Registration successful, returning to the main menu "
-                "shortly.\n");
+                "shortly.");
+            fflush(stdout);
             sleep(1);
             break;
         } else {

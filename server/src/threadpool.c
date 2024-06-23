@@ -12,7 +12,8 @@ static int touchClient(Task* task, Command cmd) {
         strcat(old_data, p[i]);
         strcat(old_data, " ");
     }
-    sprintf(data, "%s %s %d", old_data, task->token, task->uid);
+    sprintf(data, "%s %s %d", old_data, task->token ? task->token : "newbee",
+            task->uid);
     log_debug("touch client data: %s", data);
     int data_len = strlen(data);
 
@@ -53,8 +54,8 @@ static int tellClient(int connfd, int* user_table) {
     // sprintf(conn_data, "%s %s %s %d", "localhost", "30002", token,
     //        user_table[connfd]);
     char conn_data[1024] = {0};
-    sprintf(conn_data, "%d %s %s %s", user_table[connfd], "192.168.19.172",
-            "30002", token);
+    sprintf(conn_data, "%d %s %s %s", user_table[connfd], "localhost", "30002",
+            token);
     int data_len = strlen(conn_data);
     sendn(connfd, &data_len, sizeof(int));
     sendn(connfd, conn_data, data_len);
@@ -71,7 +72,7 @@ void* eventLoop(void* arg) {
 
         // 优雅退出
         if (task->fd == -1) {
-            log_debug("%lu Da! Moving out!\n", tid);
+            log_debug("%lu Da! Moving out!", tid);
             pthread_exit(0);
         }
 
@@ -123,7 +124,7 @@ void* eventLoop(void* arg) {
         }
         freeTask(task);
 
-        log_debug("%lu Ura! Waiting orders.\n", tid);
+        log_debug("%lu Ura! Waiting orders.", tid);
     }
 }
 

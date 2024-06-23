@@ -64,7 +64,6 @@ int main(int argc, char* argv[]) {
     // 将 STDIN_FILENO 加入 epoll
     epollAdd(epfd, STDIN_FILENO);
 
-    log_info("all ready");
     // 主循环
     while (1) {
         int nready = epoll_wait(epfd, ready_events, MAXEVENTS, -1);
@@ -292,7 +291,7 @@ int responseHandler(int sockfd, ThreadPool* pool) {
                     task = makeLongTask(cmd, res_data, g_uid, g_new_host,
                                         g_new_port, g_token);
                     blockqPush(pool->task_queue, task);
-                    sleepMilliseconds(100);
+                    sleepMilliseconds(200);
                     printPrompt();
                     return 0;
 
@@ -345,7 +344,7 @@ void printMenu(void) {
         "                 2. Register            \n"
         "                 3. Exit                \n"
         "                                        \n"
-        "                                     v1.0\n"
+        "                                     v4.0\n"
         "\033[0m"
         "                                        \n");
 }

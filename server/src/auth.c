@@ -494,7 +494,6 @@ void loginCheck2(Task* task) {
         int pwdid = getPwdId(pconn, uid);
         getPwd(pconn, pwdid, cwd, sizeof(cwd));
         releaseDBConnection(task->dbpool, pconn);
-        printf("用户上次目录：%s\n", cwd);
         // 发送给客户端
         int cwd_len = strlen(cwd);
         sendn(task->fd, &cwd_len, sizeof(int));
