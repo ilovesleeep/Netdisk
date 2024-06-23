@@ -288,8 +288,7 @@ int getFileInfo(MYSQL* mysql, int pwdid, char* f_hash, off_t* f_size,
 
 // 传入文件哈希值,通过传参返回文件大小和现存最大文件大小
 int localFile(MYSQL* mysql, char* f_hash, off_t* f_size, off_t* c_size) {
-    *f_size = 0;
-    *c_size = 0;
+    *f_size = 0, *c_size = 0;
     char sql[] = "SELECT f_size, c_size FROM nb_vftable WHERE f_hash = ?";
 
     MYSQL_STMT* stmt = mysql_stmt_init(mysql);
@@ -316,18 +315,18 @@ int localFile(MYSQL* mysql, char* f_hash, off_t* f_size, off_t* c_size) {
     if (ret == 1) {
         printf("%s", mysql_stmt_error(stmt));
     }
-
-    MYSQL_RES* res = mysql_stmt_result_metadata(stmt);
+    // MYSQL_RES* res = mysql_stmt_result_metadata(stmt);
 
     MYSQL_BIND res_bind[2];
+    bzero(res_bind, sizeof(res_bind));
     res_bind[0].buffer_type = MYSQL_TYPE_LONGLONG;
-    res_bind[0].buffer = (long long*)f_size;
-    res_bind[0].buffer_length = sizeof(long long);
+    res_bind[0].buffer = f_size;
+    res_bind[0].buffer_length = sizeof(off_t);
 
     off_t max_size = 0;
     res_bind[1].buffer_type = MYSQL_TYPE_LONGLONG;
-    res_bind[1].buffer = (long long*)&max_size;
-    res_bind[1].buffer_length = sizeof(long long);
+    res_bind[1].buffer = &max_size;
+    res_bind[1].buffer_length = sizeof(off_t);
 
     ret = mysql_stmt_bind_result(stmt, res_bind);
     if (ret) {
@@ -346,7 +345,7 @@ int localFile(MYSQL* mysql, char* f_hash, off_t* f_size, off_t* c_size) {
         }
         *c_size = max_size > *c_size ? max_size : *c_size;
     }
-    mysql_free_result(res);
+    // mysql_free_result(res);
     mysql_stmt_free_result(stmt);
     return 0;
 }
@@ -414,6 +413,8 @@ int updateRecord(MYSQL* mysql, int pwdid, const int* p_id, const int* u_id,
         }
     }
     sprintf(sql, "%s%s%d", sql, "WHERE id = ", pwdid);
-    mysql_query(mysql, sql);
+
+    int ret = mysql_query(mysql, sql);
+
     return 0;
 }

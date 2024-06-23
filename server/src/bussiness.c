@@ -11,11 +11,12 @@
 #define BUFSIZE 4096
 #define MAXLINE 1024
 #define BIGFILE_SIZE (100 * 1024 * 1024)
-#define MMAPSIZE (1024 * 1024 * 10)
+#define MMAPSIZE (1024 * 1024)
 #define HASH_SIZE 32
 
 int sendFile(int sockfd, int fd, off_t f_size) {
-    // 接收客户端想从哪里开始发
+
+    //0为秒传了，1为未秒传
     int recv_stat = 0;
     recvn(sockfd, &recv_stat, sizeof(int));
     if (recv_stat == 0) {
@@ -61,8 +62,6 @@ int sendFile(int sockfd, int fd, off_t f_size) {
         // 比较
         if (memcmp(md5sum_client, md5_hex, HASH_SIZE) != 0) {
             // 不是一个文件,重新来过吧
-            int send_stat = 1;
-            sendn(sockfd, &send_stat, sizeof(int));
             send_bytes = 0;
         }
     }
@@ -156,7 +155,6 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
         int send_stat = 0;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
     }
-
     // 查表查看是否文件存在(f_hash)(是否可以续传)
     off_t f_size = 0, c_size = 0;
     localFile(mysql, (char*)recv_hash, &f_size, &c_size);
