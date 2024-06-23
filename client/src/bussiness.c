@@ -6,7 +6,7 @@
 #define BUFSIZE 4096
 #define MAXLINE 1024
 #define BIGFILE_SIZE (100 * 1024 * 1024)
-#define MMAPSIZE (1024 * 1024 * 10)
+#define MMAPSIZE (1024 * 1024)
 #define HASH_SIZE 32
 
 typedef struct {
@@ -159,7 +159,6 @@ int recvFile(int sockfd) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
-    // 检查0为没有存在过,1为存在过
     struct stat statbuf;
     fstat(fd, &statbuf);
     off_t recv_bytes = 0;
@@ -170,8 +169,6 @@ int recvFile(int sockfd) {
         sendn(sockfd, &recv_bytes, sizeof(off_t));
     } else {
         // 存在过,检查哈希值,检查哈希值全部以MMAPSIZE为单位来查找
-        int send_stat = 1;
-        sendn(sockfd, &send_stat, sizeof(int));
         // 计算哈希值
         char empty[MMAPSIZE] = {0};
         MD5_CTX ctx;
