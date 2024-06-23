@@ -249,6 +249,20 @@ Task* makeLongTask(Command cmd, char* res_data, int uid, char* new_host,
     return task;
 }
 
+static void sleepMilliseconds(long milliseconds) {
+    struct timespec req, rem;
+
+    if (milliseconds > 999) {
+        req.tv_sec = (int)(milliseconds / 1000);         // 秒
+        req.tv_nsec = (milliseconds % 1000) * 1000000L;  // 纳秒
+    } else {
+        req.tv_sec = 0;                         // 秒
+        req.tv_nsec = milliseconds * 1000000L;  // 纳秒
+    }
+
+    nanosleep(&req, &rem);
+}
+
 int responseHandler(int sockfd, ThreadPool* pool) {
     // 接收响应长度
     int res_len = -1;
@@ -278,6 +292,7 @@ int responseHandler(int sockfd, ThreadPool* pool) {
                     task = makeLongTask(cmd, res_data, g_uid, g_new_host,
                                         g_new_port, g_token);
                     blockqPush(pool->task_queue, task);
+                    sleepMilliseconds(100);
                     printPrompt();
                     return 0;
 

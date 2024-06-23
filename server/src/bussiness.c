@@ -15,8 +15,7 @@
 #define HASH_SIZE 32
 
 int sendFile(int sockfd, int fd, off_t f_size) {
-
-    //0为秒传了，1为未秒传
+    // 0为秒传了，1为未秒传
     int recv_stat = 0;
     recvn(sockfd, &recv_stat, sizeof(int));
     if (recv_stat == 0) {
@@ -156,11 +155,11 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
     }
     // 查表查看是否文件存在(f_hash)(是否可以续传)
-    off_t f_size = 0, c_size = 0;
+    off_t f_size, c_size;
     localFile(mysql, (char*)recv_hash, &f_size, &c_size);
     if (c_size == f_size && f_size != 0) {
         // 文件已存在且完整
-        printf("*****秒了\n");
+        log_info("************** 秒了 **************");
         int send_stat = 0;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
 
@@ -206,8 +205,8 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
 
             recv_bytes += length;
 
-            log_info("downloading %5.2lf%%", 100.0 * recv_bytes / fsize);
-            // fflush(stdout);
+            printf("[INFO] downloading %5.2lf%%\r", 100.0 * recv_bytes / fsize);
+            fflush(stdout);
         }
     } else {
         char buf[BUFSIZE];
@@ -224,13 +223,13 @@ int recvFile(int sockfd, MYSQL* mysql, int u_id) {
 
             recv_bytes += length;
 
-            log_info("downloading %5.2lf%%", 100.0 * recv_bytes / fsize);
-            // fflush(stdout);
+            printf("[INFO] downloading %5.2lf%%\r", 100.0 * recv_bytes / fsize);
+            fflush(stdout);
         }
     }
     updateRecord(mysql, file_id, NULL, NULL, NULL, NULL, NULL, &recv_bytes,
                  "1");
-    log_info("downloading %5.2lf%%", 100.0);
+    printf("[INFO] downloading %5.2lf%%\n", 100.0);
     close(fd);
     return 0;
 }
@@ -476,7 +475,7 @@ void rmCmd(Task* task) {
     // 告知客户端，接受当前命令的响应
     touchClient(task);
     char** parameter = task->args;
-    // NOTE:
+    // TODO:
     // 删除文件及目录。
     // 如果删除的是文件，则直接将它的exist设为“0”。
     // 如果删除的是目录，则需要查看它是否存在子目录。需要遍历父目录id，找到和本目录id相等的行。
@@ -612,9 +611,6 @@ int getsCmd(Task* task) {
     int pwdid = getPwdId(mysql, task->uid);
     // 发送文件
     char** parameter = task->args;
-    for (int i = 1; parameter[i]; i++) {
-        printf("******************%s\n", parameter[i]);
-    }
     for (int i = 1; parameter[i]; i++) {
         char file_name[512] = {0};
         int target_pwdid = pwdid;

@@ -48,7 +48,7 @@ int makeToken(char* token, int uid) {
 
 // 成功返回 0， 失败返回 1
 int checkToken(char* token, int uid) {
-    log_info("Token Checking ... \n%s\n", token);
+    log_info("Token Checking ... \n%s", token);
 
     char* jwt = token;
 
@@ -84,10 +84,10 @@ int checkToken(char* token, int uid) {
 
     if (decode_result == L8W8JWT_SUCCESS &&
         validation_result == L8W8JWT_VALID) {
-        log_info("NewBee HS512 token validation successful! \n");
+        log_info("NewBee HS512 token validation successful!");
         return 0;
     } else {
-        log_warn("NewBee HS512 token validation failed! \n");
+        log_warn("NewBee HS512 token validation failed!");
         return 1;
     }
 }

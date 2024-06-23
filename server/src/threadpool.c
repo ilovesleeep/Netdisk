@@ -13,7 +13,7 @@ static int touchClient(Task* task, Command cmd) {
         strcat(old_data, " ");
     }
     sprintf(data, "%s %s %d", old_data, task->token, task->uid);
-    log_debug("data: %s", data);
+    log_debug("touch client data: %s", data);
     int data_len = strlen(data);
 
     int res_len = sizeof(Command) + data_len;
@@ -53,8 +53,8 @@ static int tellClient(int connfd, int* user_table) {
     // sprintf(conn_data, "%s %s %s %d", "localhost", "30002", token,
     //        user_table[connfd]);
     char conn_data[1024] = {0};
-    sprintf(conn_data, "%d %s %s %s", user_table[connfd], "localhost", "30002",
-            token);
+    sprintf(conn_data, "%d %s %s %s", user_table[connfd], "192.168.19.172",
+            "30002", token);
     int data_len = strlen(conn_data);
     sendn(connfd, &data_len, sizeof(int));
     sendn(connfd, conn_data, data_len);

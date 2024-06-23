@@ -91,7 +91,7 @@ int sendFile(int sockfd, int fd) {
         int info_len = 0;
         recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
         char recv_info[100] = {0};
-        recv(sockfd, recv_info, sizeof(recv_info), MSG_WAITALL);
+        recv(sockfd, recv_info, info_len, MSG_WAITALL);
         puts(recv_info);
     }
 
@@ -297,7 +297,7 @@ int cdCmd(int sockfd, char* cwd) {
         recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
         char buf[MAXLINE] = {0};
         recv(sockfd, buf, info_len, MSG_WAITALL);
-        printf("Error: %s\n", buf);
+        printf("Sorry, %s\n", buf);
         return -1;
     } else {
         int pwd_len = 0;
@@ -342,7 +342,7 @@ int lsCmd(int sockfd) {
                 if (type == 'f') {
                     printf("\033[0m%s\t", name);
                 } else if (type == 'd') {
-                    printf("\033[34m%s\t", name);
+                    printf("\033[36m%s\t", name);
                 }
             }
             break;
@@ -382,6 +382,7 @@ int rmCmd(int sockfd) {
         char error_info[MAXLINE] = {0};
         recv(sockfd, error_info, info_len, MSG_WAITALL);
         puts(error_info);
+        log_error("%s", error_info);
         return -1;
     }
 
@@ -394,6 +395,7 @@ int rmCmd(int sockfd) {
         recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
         recv(sockfd, recv_info, info_len, MSG_WAITALL);
         puts(recv_info);
+        log_error("%s", recv_info);
         return -1;
     }
 
@@ -419,6 +421,11 @@ int getsCmd(int sockfd) {
         recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
         char error_info[1000] = {0};
         recv(sockfd, error_info, info_len, MSG_WAITALL);
+        // printf("%s%s%s\n%s%s", SAVE_CURSOR, UP_CURSOR, INSERT_LINE,
+        // error_info,
+        //        RESTORE_CURSOR);
+        // fflush(stdout);
+        puts(error_info);
         log_error("%s", error_info);
         return -1;
     }
@@ -433,6 +440,11 @@ int getsCmd(int sockfd) {
             char recv_info[1000] = {0};
             recv(sockfd, &info_len, sizeof(int), MSG_WAITALL);
             recv(sockfd, recv_info, info_len, MSG_WAITALL);
+            // printf("%s%s%s%s%s", SAVE_CURSOR, UP_CURSOR, CLEAR_LINE,
+            // recv_info,
+            //        RESTORE_CURSOR);
+            // fflush(stdout);
+            // puts(recv_info);
             log_info("%s", recv_info);
             break;
         }
@@ -449,7 +461,7 @@ int putsCmd(int sockfd, char** args) {
 
     // 参数错误
     if (args[1] == NULL) {
-        printf("\nparameter error\n");
+        printf("Parameter error\n");
         int send_stat = 1;
         send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
         return -1;
@@ -461,7 +473,8 @@ int putsCmd(int sockfd, char** args) {
         if (fd == -1) {
             int send_stat = 1;
             send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
-            printf("\npath error : no find NO.%d file\n", i);
+            // printf("\npath error : no find NO.%d file\n", i);
+            log_error("Path error : no find NO.%d file", i);
             return -1;
         }
 
@@ -491,18 +504,19 @@ int putsCmd(int sockfd, char** args) {
     int send_stat = 1;
     send(sockfd, &send_stat, sizeof(int), MSG_NOSIGNAL);
     // printf("\nputs success\n");
+    log_info("puts success");
     return 0;
 }
 
 int mkdirCmd(int sockfd) {
     // 接收函数，大火车
-    int msg_len = 0;
+    int name_len = 0;
     // bufsize = 4096;
-    char msg[BUFSIZE] = {0};
-    recv(sockfd, &msg_len, sizeof(int), MSG_WAITALL);
-    if (msg_len != 0) {
-        recv(sockfd, msg, msg_len, MSG_WAITALL);
-        printf("%s\n", msg);
+    char filename[BUFSIZE] = {0};
+    recv(sockfd, &name_len, sizeof(int), MSG_WAITALL);
+    if (name_len != 0) {
+        recv(sockfd, filename, name_len, MSG_WAITALL);
+        printf("%s\n", filename);
     }
 
     return 0;

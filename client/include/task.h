@@ -9,11 +9,13 @@ typedef struct {
     char* token;
     char* host;
     char* port;
+    char** args;  // gets, puts 需要的参数
 
-    // gets, puts 需要的参数
-    char** args;
-
-    // TODO: 方案1：分片+合并
+    // TODO: 多点下载的想法
+    // 场景：一个主服务器
+    // 客户端向主服务器发送 GETS1 命令，
+    // GETS1 阶段成功后，主服务器会向客户端发送
+    //
     // char* file;        // 文件名
     // int splice_start;  // 文件切片起始位置
     // int splice_size;   // 文件切片大小
