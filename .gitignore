@@ -56,6 +56,4 @@ dkms.conf
 *.txt
 *.log
 .vscode/
-k/
 main
-afsdf
