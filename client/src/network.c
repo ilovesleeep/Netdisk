@@ -34,3 +34,23 @@ int tcpConnect(const char* host, const char* port) {
 
     return sockfd;
 }
+
+void epollAdd(int epfd, int fd) {
+    struct epoll_event event;
+    event.events = EPOLLIN;
+    event.data.fd = fd;
+    if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &event) == -1) {
+        error(1, errno, "epoll_ctl_add");
+    }
+}
+
+void epollDel(int epfd, int fd) { epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL); }
+
+void epollMod(int epfd, int fd, enum EPOLL_EVENTS epoll_events) {
+    struct epoll_event event;
+    event.events = epoll_events;
+    event.data.fd = fd;
+    if (epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &event) == -1) {
+        error(1, errno, "epoll_ctl");
+    }
+}

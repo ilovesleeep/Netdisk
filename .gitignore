@@ -52,8 +52,10 @@ Mkfile.old
 dkms.conf
 
 # Diy
+.gdb_history
 *.txt
 *.log
 .vscode/
+k/
 main
 afsdf

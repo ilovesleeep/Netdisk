@@ -3,25 +3,29 @@
 
 #include "head.h"
 
-typedef struct {
-    int port;
-    int num_threads;
-} ServerConfig;
-
 typedef enum {
     CMD_CD,
     CMD_LS,
     CMD_RM,
     CMD_PWD,
-    CMD_GETS,
-    CMD_PUTS,
     CMD_MKDIR,
+    CMD_GETS1,
+    CMD_PUTS1,
+    CMD_GETS2,
+    CMD_PUTS2,
+    CMD_REG1,
+    CMD_REG2,
+    CMD_LOGIN1,
+    CMD_LOGIN2,
+    CMD_INFO_TOKEN,
     CMD_EXIT,
+    CMD_STOP,
     CMD_UNKNOWN,
 } Command;
 
 char** parseRequest(const char* req);
-void argsFree(char** args);
+
+void freeStringArray(char** array);
 
 Command getCommand(const char* cmd);
 
