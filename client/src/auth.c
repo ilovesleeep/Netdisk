@@ -41,7 +41,7 @@ static int userRegister1(int sockfd, char* username, char* salt) {
         fflush(stdout);
         char name[MAX_NAME_LENGTH + 1] = {0};
         int name_len = read(STDIN_FILENO, name, MAX_NAME_LENGTH + 1);
-        if (name_len > MAX_NAME_LENGTH) {
+        if (name_len >= MAX_NAME_LENGTH) {
             printf("Max name length is 20, please re-enter\n");
             continue;
         } else if (name_len <= 1) {  // name == "\n"
@@ -102,7 +102,7 @@ static int userRegister2(int sockfd, char* username, char* salt) {
         char s2[64] = {0};
         int count = 0;
         do {
-            if (++count == 3) {
+            if (count++ == 3) {
                 printf("Too many tries, exit.\n");
                 exit(EXIT_SUCCESS);
             }
@@ -157,9 +157,9 @@ static int userLogin2(int sockfd, char* cwd, char* salt);
 
 int userLogin(int sockfd, char* name, char* cwd) {
     char salt[MAXLINE] = {0};
-    // 发送用户名
+    // 发送用户名，接收 salt
     userLogin1(sockfd, name, salt);
-    // 发送密码
+    // 对密码进行加盐加密，发送密文
     userLogin2(sockfd, cwd, salt);
 
     return 0;
@@ -226,7 +226,7 @@ static int userLogin1(int sockfd, char* name, char* salt) {
 static int userLogin2(int sockfd, char* cwd, char* salt) {
     int count = 0;
     while (1) {
-        if (++count == 3) {
+        if (count++ == 3) {
             printf("Too many incorrect password attempts, exit.\n");
             exit(EXIT_SUCCESS);
         }

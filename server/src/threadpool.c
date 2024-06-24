@@ -103,7 +103,6 @@ void* eventLoop(void* arg) {
                 if (checkToken(task->token, task->uid) == 0) {
                     log_debug("[%d] Authentication section 2 success",
                               task->uid);
-                    // freeUnusedParameter(task->args);
                     ret = taskHandler(task);
                     char* tmp = task->cmd == CMD_GETS2 ? "gets" : "puts";
                     log_debug("%s done", tmp);

@@ -434,7 +434,7 @@ void loginCheck1(Task* task) {
     int status_code = 0;
     MYSQL* pconn = getDBConnection(task->dbpool);
     int exist = userExist(pconn, username);
-    log_info("[%s] exist = [%d]", task->args[1], exist);
+    log_debug("[%s] exist = [%d]", task->args[1], exist);
 
     if (exist == 0) {
         releaseDBConnection(task->dbpool, pconn);

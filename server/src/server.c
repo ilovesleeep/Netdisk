@@ -150,7 +150,7 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
             break;
         default:
             // 父进程
-            log_info("%d MCV porcess reporting", getpid());
+            log_info("%d MCV reporting", getpid());
             close(g_exit_pipe[0]);
             // 捕获 SIGUSR1 信号
             if (signal(SIGUSR1, exitHandler) == SIG_ERR) {
@@ -161,7 +161,7 @@ int serverMain(ServerConfig* conf, HashTable* ht) {
             exit(0);
     }
     // 子进程
-    log_info("%d Kirov process reporting", getpid());
+    log_info("%d Kirov reporting", getpid());
     close(g_exit_pipe[1]);
 
     // 更改工作目录为 ./user

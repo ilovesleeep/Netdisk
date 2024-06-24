@@ -363,7 +363,7 @@ int lsCmd(int sockfd) {
                     recv(sockfd, &f_size, sizeof(off_t), MSG_WAITALL);
                     printf("%ld\n", f_size);
                 } else if (type == 'd') {
-                    printf("\033[34m%s\n", name);
+                    printf("\033[36m%s\n", name);
                 }
             }
             break;
